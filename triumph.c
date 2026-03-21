@@ -494,7 +494,7 @@ static int b_kill(Cmd *c){
 static int b_sleep(Cmd *c){if(c->argc<2)return 1;usleep((useconds_t)(atof(c->argv[1])*1e6));return 0;}
 static int b_date(Cmd *c){(void)c;time_t t=time(NULL);printf("%s%s%s\n",CYN,ctime(&t),RST);return 0;}
 static int b_uname(Cmd *c){struct utsname u;uname(&u);int a=c->argc>1&&strcmp(c->argv[1],"-a")==0;
-    if(a)printf("%s %s %s %s %s\n",u.sysname,u.nodename,u.release,u.version,u.machine);else printf("%s\n",u.sysname);return 0;}
+    if(a)printf("Triumph %s Triumph-1.0.0 Triumph-OS %s\n",u.nodename,u.machine);else printf("Triumph\n");return 0;}
 static int b_hostname(Cmd *c){if(c->argc>1){sethostname(c->argv[1],strlen(c->argv[1]));return 0;}char h[256];gethostname(h,sizeof(h));printf("%s%s%s\n",CYN,h,RST);return 0;}
 static int b_whoami(Cmd *c){(void)c;struct passwd *pw=getpwuid(getuid());printf("%s%s%s\n",GRN,pw?pw->pw_name:"?",RST);return 0;}
 static int b_id(Cmd *c){(void)c;uid_t uid=getuid();gid_t gid=getgid();struct passwd *pw=getpwuid(uid);struct group *gr=getgrgid(gid);printf("%suid%s=%s%d%s(%s) %sgid%s=%s%d%s(%s)\n",YLW,RST,CYN,uid,RST,pw?pw->pw_name:"?",YLW,RST,CYN,gid,RST,gr?gr->gr_name:"?");return 0;}
