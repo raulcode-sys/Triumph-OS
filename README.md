@@ -3,6 +3,8 @@
 A from-scratch operating system written in C, running on a Linux kernel with a
 custom userspace. TTY-only, single static binary for the entire shell + apps.
 
+Note: It is a stand-alone Linux distro as it is based off of the Linux kernel.
+
 ```
 ████████╗██████╗ ██╗██╗   ██╗███╗   ███╗██████╗ ██╗  ██╗
 ╚══██╔══╝██╔══██╗██║██║   ██║████╗ ████║██╔══██╗██║  ██║
