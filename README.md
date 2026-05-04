@@ -50,6 +50,7 @@ gcc -O2 -static -w -o init init.c
 fakeroot bash -c 'cd initramfs && find . | cpio -o -H newc | gzip -9 > ../initramfs.img'
 grub-mkrescue --output=triumph-os.iso iso/ --compress=xz
 ```
+Or just downloads the ISO from the 'Releases' menu.
 
 ## Running
 
