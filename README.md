@@ -23,14 +23,13 @@ custom userspace. TTY-only, single static binary for the entire shell + apps.
 - **File explorer** — arrow nav, Shift+R/E/D for read/edit/delete.
 - **Web browser** — HTTP and HTTPS via mbedTLS, hand-rolled DHCP client.
 - **Bundled Realtek r8169 driver + firmware** for ethernet on most laptops.
-- **PC speaker sounds** for boot, games, shutdown.
+- **Boot melody**
 
 ## What's NOT here, on purpose
 
-- No WiFi (would need wpa_supplicant + 100MB of firmware blobs).
-- No X11 / XFCE (would need ~1.5GB of dependencies).
-- No JavaScript / CSS rendering in the browser.
-- No real audio (PC speaker only).
+- No WiFi (would need wpa_supplicant + 100MB of firmware blobs) also helps privacy wise.
+- No X11 / XFCE (would need ~1.5GB of dependencies), reduces bloat.
+- No JavaScript / CSS rendering in the browser, helps privacy wise and reduces bloate.
 
 ## Building
 
@@ -50,7 +49,7 @@ gcc -O2 -static -w -o init init.c
 fakeroot bash -c 'cd initramfs && find . | cpio -o -H newc | gzip -9 > ../initramfs.img'
 grub-mkrescue --output=triumph-os.iso iso/ --compress=xz
 ```
-Or just downloads the ISO from the 'Releases' menu.
+***Or just downloads the ISO from the 'Releases' menu.***
 
 ## Running
 
