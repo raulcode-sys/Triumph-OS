@@ -9,6 +9,70 @@
 #include <sys/ioctl.h>
 #include <sound/asound.h>
 
+
+/* Iterate all controls on the sound card and set every "Switch" to ON,
+ * every "Volume" to max. Uses ALSA's control ioctl interface. */
+static void audio_unmute_all(void) {
+    int cf = open("/dev/snd/controlC0", O_RDWR);
+    if (cf < 0) return;
+
+    /* Get total control count */
+    struct snd_ctl_elem_list elist;
+    memset(&elist, 0, sizeof(elist));
+    if (ioctl(cf, SNDRV_CTL_IOCTL_ELEM_LIST, &elist) < 0) {
+        close(cf); return;
+    }
+
+    int count = elist.count;
+    if (count <= 0) { close(cf); return; }
+
+    /* Allocate id array */
+    struct snd_ctl_elem_id *ids = calloc(count, sizeof(struct snd_ctl_elem_id));
+    if (!ids) { close(cf); return; }
+
+    elist.offset  = 0;
+    elist.space   = count;
+    elist.pids    = ids;
+    if (ioctl(cf, SNDRV_CTL_IOCTL_ELEM_LIST, &elist) < 0) {
+        free(ids); close(cf); return;
+    }
+
+    for (unsigned int i = 0; i < elist.used; i++) {
+        struct snd_ctl_elem_info info;
+        memset(&info, 0, sizeof(info));
+        info.id = ids[i];
+        if (ioctl(cf, SNDRV_CTL_IOCTL_ELEM_INFO, &info) < 0) continue;
+
+        struct snd_ctl_elem_value val;
+        memset(&val, 0, sizeof(val));
+        val.id = ids[i];
+
+        if (info.type == SNDRV_CTL_ELEM_TYPE_BOOLEAN) {
+            /* Switch — turn ON unless name has "Capture" or "Mic Boost" or similar */
+            const char *n = (const char *)info.id.name;
+            int turn_on = 1;
+            if (strstr(n, "Capture")) turn_on = 0;
+            for (unsigned j = 0; j < info.count && j < 16; j++)
+                val.value.integer.value[j] = turn_on;
+            ioctl(cf, SNDRV_CTL_IOCTL_ELEM_WRITE, &val);
+        }
+        else if (info.type == SNDRV_CTL_ELEM_TYPE_INTEGER) {
+            const char *n = (const char *)info.id.name;
+            /* Skip capture-side and mic boost gain */
+            if (strstr(n, "Capture")) continue;
+            if (strstr(n, "Mic Boost")) continue;
+            /* Set to max */
+            long v = info.value.integer.max;
+            for (unsigned j = 0; j < info.count && j < 16; j++)
+                val.value.integer.value[j] = v;
+            ioctl(cf, SNDRV_CTL_IOCTL_ELEM_WRITE, &val);
+        }
+    }
+
+    free(ids);
+    close(cf);
+}
+
 static int audio_play_wav(const char *path) {
     int wf = open(path, O_RDONLY);
     if (wf < 0) return -1;
@@ -164,6 +228,7 @@ static int audio_play_wav(const char *path) {
 static void audio_play_wav_async(const char *path) {
     pid_t p = fork();
     if (p == 0) {
+        audio_unmute_all();
         audio_play_wav(path);
         _exit(0);
     }
