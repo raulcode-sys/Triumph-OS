@@ -39,6 +39,58 @@
 #define WB_GRN "\x1b[38;5;82m"
 #define WB_RED "\x1b[38;5;196m"
 
+/* URL history — last 16 URLs visited */
+#define WB_HIST_MAX 16
+static char wb_history[WB_HIST_MAX][256];
+static int  wb_history_n = 0;
+
+static void wb_history_load(void) {
+    int fd = open("/root/.web_history", O_RDONLY);
+    if (fd < 0) return;
+    char buf[8192]; int n = read(fd, buf, sizeof(buf)-1);
+    close(fd);
+    if (n <= 0) return;
+    buf[n] = 0;
+    char *p = buf;
+    while (*p && wb_history_n < WB_HIST_MAX) {
+        char *eol = strchr(p, '\n');
+        if (eol) *eol = 0;
+        if (*p) {
+            strncpy(wb_history[wb_history_n], p, 255);
+            wb_history[wb_history_n][255] = 0;
+            wb_history_n++;
+        }
+        if (!eol) break;
+        p = eol + 1;
+    }
+}
+
+static void wb_history_add(const char *url) {
+    if (!url || !*url) return;
+    for (int i = 0; i < wb_history_n; i++) {
+        if (strcmp(wb_history[i], url) == 0) {
+            for (int j = i; j > 0; j--)
+                strcpy(wb_history[j], wb_history[j-1]);
+            strncpy(wb_history[0], url, 255);
+            wb_history[0][255] = 0;
+            goto save;
+        }
+    }
+    if (wb_history_n < WB_HIST_MAX) wb_history_n++;
+    for (int j = wb_history_n - 1; j > 0; j--)
+        strcpy(wb_history[j], wb_history[j-1]);
+    strncpy(wb_history[0], url, 255);
+    wb_history[0][255] = 0;
+save:;
+    int fd = open("/root/.web_history", O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    if (fd < 0) return;
+    for (int i = 0; i < wb_history_n; i++) {
+        write(fd, wb_history[i], strlen(wb_history[i]));
+        write(fd, "\n", 1);
+    }
+    close(fd);
+}
+
 #include <sys/syscall.h>
 static int wb_load_module(const char *path, char *err, size_t errsz) {
     int fd = open(path, O_RDONLY);
@@ -755,7 +807,13 @@ static int wb_readkey(int blocking) {
         unsigned char seq[3]; int n=read(0,seq,3);
         tcsetattr(0,TCSANOW,&cur);
         if (n<=0) return 27;
-        return -1;
+        if (n>=2 && seq[0]=='[') {
+            if (seq[1]=='A') return 0x101; /* up */
+            if (seq[1]=='B') return 0x102; /* down */
+            if (seq[1]=='C') return 0x103;
+            if (seq[1]=='D') return 0x104;
+        }
+        return 27;
     }
     return c;
 }
@@ -783,21 +841,42 @@ static void wb_url_input(char *url, size_t sz, int rows, int cols) {
     wb_w(WB_FG "└"); for(int i=0;i<boxw-2;i++) wb_w("─"); wb_w("┘");
 
     wb_at(y+4, x);
-    wb_w(WB_DIM "Type URL, Enter to fetch, Esc to cancel");
+    wb_w(WB_DIM "Type URL, ↑↓ history, Enter to fetch, Esc to cancel");
 
     wb_at(y+1, x + 2 + ilen);
     wb_w("\x1b[?25h");
     fflush(stdout);
 
+    int hist_idx = -1;  /* -1 means "current input", 0..n-1 are history entries */
     while (1) {
         int k = wb_readkey(1);
-        if (k == 27 || k == -1) { url[0]=0; break; }
-        if (k == 13 || k == 10) { strncpy(url, input, sz-1); url[sz-1]=0; break; }
-        if ((k == 127 || k == 8) && ilen > 0) {
+        if (k == 27)              { url[0]=0; break; }
+        if (k == 13 || k == 10)   { strncpy(url, input, sz-1); url[sz-1]=0; break; }
+        if (k == 0x101) {  /* up — older entry */
+            if (wb_history_n > 0 && hist_idx < wb_history_n - 1) {
+                hist_idx++;
+                strncpy(input, wb_history[hist_idx], sizeof(input)-1);
+                input[sizeof(input)-1] = 0;
+                ilen = strlen(input);
+            }
+        } else if (k == 0x102) {  /* down — newer */
+            if (hist_idx > 0) {
+                hist_idx--;
+                strncpy(input, wb_history[hist_idx], sizeof(input)-1);
+                input[sizeof(input)-1] = 0;
+                ilen = strlen(input);
+            } else if (hist_idx == 0) {
+                hist_idx = -1;
+                strcpy(input, "http://");
+                ilen = 7;
+            }
+        } else if ((k == 127 || k == 8) && ilen > 0) {
             ilen--; input[ilen]=0;
+            hist_idx = -1;
         } else if (k >= 32 && k < 127 && ilen < (int)sizeof(input)-1) {
             input[ilen++] = (char)k;
             input[ilen] = 0;
+            hist_idx = -1;
         }
         wb_at(y+1, x+2);
         wb_w(WB_YEL);
@@ -885,6 +964,8 @@ static int b_web(Cmd *c) { (void)c;
     int cols = ws.ws_col?ws.ws_col:80;
 
     wb_w("\x1b[?25l\x1b[2J");
+
+    wb_history_load();
 
     /* 1. Find ethernet */
     char ifname[32];
@@ -1003,6 +1084,7 @@ static int b_web(Cmd *c) { (void)c;
         char *body = strstr(page, "\r\n\r\n");
         if (body) body += 4; else body = page;
         html_to_text(body, text, 256*1024);
+        wb_history_add(url);
         render_text(text, rows, cols);
         free(page); free(text);
     }

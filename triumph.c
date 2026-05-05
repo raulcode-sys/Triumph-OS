@@ -611,6 +611,7 @@ static int b_help(Cmd *c){(void)c;
 
 #include <sys/reboot.h>
 #include "beep.c"
+#include "audio.c"
 static int b_poweroff(Cmd *c){(void)c;
     pc_play(SND_SHUTDOWN);
     sync();
@@ -883,8 +884,6 @@ int main(int argc,char *argv[]){
         system("mount -t devtmpfs dev /dev  2>/dev/null");
         system("mount -t tmpfs  tmp  /tmp  2>/dev/null");}
     show_banner();
-    /* Boot melody on PC speaker */
-    pc_play(SND_BOOT);
     /* Boot directly into the fullscreen menu */
     { Cmd dc={0}; b_menu(&dc); }
     char line[SH_MAX_INPUT];

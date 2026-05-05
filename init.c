@@ -15,6 +15,7 @@
 #include <time.h>
 
 #include "splash.c"
+#include "audio.c"
 
 
 /* Load a kernel module via the init_module syscall */
@@ -131,11 +132,54 @@ int main(void){
         } else {
             char buf[256]; snprintf(buf, sizeof(buf), "r8169 load failed: %s", err);
             kmsg(buf);
-            /* Also write to a file the user can see */
             int fd = open("/tmp/r8169_error.txt", O_WRONLY|O_CREAT|O_TRUNC, 0644);
             if (fd >= 0) { write(fd, buf, strlen(buf)); write(fd, "\n", 1); close(fd); }
         }
     }
+
+    /* Load HDA audio stack — order matters */
+    {
+        const char *audio_modules[] = {
+            "/lib/modules/6.8.0-111-generic/kernel/sound/soundcore.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/core/snd.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/core/snd-timer.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/core/snd-pcm.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/core/snd-hwdep.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/hda/snd-intel-sdw-acpi.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/hda/snd-intel-dspcfg.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/hda/snd-hda-core.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/pci/hda/snd-hda-codec.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/pci/hda/snd-hda-codec-generic.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/pci/hda/snd-hda-codec-realtek.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/pci/hda/snd-hda-codec-hdmi.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/sound/pci/hda/snd-hda-intel.ko",
+            NULL
+        };
+        char audio_log[1024] = "";
+        for (int i = 0; audio_modules[i]; i++) {
+            char err[200] = "";
+            if (load_module(audio_modules[i], err, sizeof(err)) == 0) {
+                strncat(audio_log, "OK: ", sizeof(audio_log)-strlen(audio_log)-1);
+            } else {
+                strncat(audio_log, "FAIL: ", sizeof(audio_log)-strlen(audio_log)-1);
+                strncat(audio_log, err,    sizeof(audio_log)-strlen(audio_log)-1);
+                strncat(audio_log, " ",    sizeof(audio_log)-strlen(audio_log)-1);
+            }
+            const char *base = strrchr(audio_modules[i], '/');
+            strncat(audio_log, base ? base+1 : audio_modules[i],
+                    sizeof(audio_log)-strlen(audio_log)-1);
+            strncat(audio_log, "\n", sizeof(audio_log)-strlen(audio_log)-1);
+        }
+        int afd = open("/tmp/audio_log.txt", O_WRONLY|O_CREAT|O_TRUNC, 0644);
+        if (afd >= 0) { write(afd, audio_log, strlen(audio_log)); close(afd); }
+        kmsg("audio modules loaded");
+    }
+
+    /* Give kernel a moment to bind audio devices and create /dev/snd entries */
+    sleep(2);
+
+    /* Start boot WAV in background — plays during the splash */
+    audio_play_wav_async("/boot.wav");
 
     splash_show();
 

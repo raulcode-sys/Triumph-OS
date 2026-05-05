@@ -68,10 +68,20 @@ static const char *MN_HELP_LINES[] = {
 static void mn_w(const char *s) { write(1, s, strlen(s)); }
 static void mn_at(int r, int c) { char b[24]; snprintf(b,24,"\x1b[%d;%dH",r,c); mn_w(b); }
 
-static int mn_readkey(void) {
+/* Returns -2 on timeout, 0 on no key, otherwise the key. */
+static int mn_readkey_timeout(int seconds) {
+    fd_set fds;
+    FD_ZERO(&fds); FD_SET(0, &fds);
+    struct timeval tv = { seconds, 0 };
+    int r = select(1, &fds, NULL, NULL, &tv);
+    if (r <= 0) return -2;  /* timeout */
     unsigned char c;
     if (read(0,&c,1)<=0) return 0;
     if (c==0x1b) {
+        /* peek for sequence with short timeout */
+        struct timeval tv2 = { 0, 100000 };
+        FD_ZERO(&fds); FD_SET(0,&fds);
+        if (select(1,&fds,NULL,NULL,&tv2) <= 0) return 27;
         unsigned char seq[3]; int n=read(0,seq,3);
         if (n>=2 && seq[0]=='[') {
             if (seq[1]=='A') return 'U';
@@ -290,7 +300,8 @@ static int b_menu(Cmd *c) { (void)c;
 
     while (1) {
         mn_draw(sel, rows, cols);
-        int k = mn_readkey();
+        int k = mn_readkey_timeout(1);
+        if (k == -2) continue;  /* timeout — just redraw */
         if      (k=='U' || k=='k' || k=='w' || k=='W') sel = (sel - 1 + MNU_N) % MNU_N;
         else if (k=='D' || k=='j' || k=='s' || k=='S') sel = (sel + 1) % MNU_N;
         else if (k==13 || k==10) {
