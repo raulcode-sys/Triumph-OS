@@ -26,6 +26,7 @@ Note: It is a stand-alone Linux distro as it is based off of the Linux kernel.
 - **Web browser** — HTTP and HTTPS via mbedTLS, hand-rolled DHCP client.
 - **Bundled Realtek r8169 driver + firmware** for ethernet on most laptops.
 - **Boot melody**
+- **Beeps for game functions**
 
 ## What's NOT here, on purpose
 
@@ -74,6 +75,8 @@ macOS:
 ```sh
 sudo dd if=triumph-os.iso of=/dev/rdiskN bs=4m
 ```
+
+*Or use software like Balena-etcher, Rufus, Ventoy etc. to put it on the usb*
 
 ## Source layout
 
