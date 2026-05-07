@@ -1,8 +1,4 @@
-/*
- * Triumph file explorer.
- * Arrow keys to navigate, Enter to descend into directory or read file.
- * Shift+E to edit, Shift+R to read, Shift+D to delete.
- */
+
 
 #define FX_BG  "\x1b[48;5;17m"
 #define FX_FG  "\x1b[38;5;51m"
@@ -32,7 +28,6 @@ static int fx_load(const char *dir, FxEnt *ents, int max_ents) {
     if (!d) return -1;
     int n = 0;
 
-    /* Always include ".." unless we're at "/" */
     if (strcmp(dir, "/") != 0 && n < max_ents) {
         strcpy(ents[n].name, "..");
         ents[n].is_dir = 1;
@@ -82,12 +77,12 @@ static int fx_readkey(int blocking) {
         tcsetattr(0,TCSANOW,&tmp);
         unsigned char seq[3]; int n = read(0,seq,3);
         tcsetattr(0,TCSANOW,&cur);
-        if (n<=0) return 27;  /* bare Esc */
+        if (n<=0) return 27;  
         if (seq[0]=='[') {
-            if (seq[1]=='A') return 0x101;  /* up */
-            if (seq[1]=='B') return 0x102;  /* down */
-            if (seq[1]=='C') return 0x103;  /* right */
-            if (seq[1]=='D') return 0x104;  /* left */
+            if (seq[1]=='A') return 0x101;  
+            if (seq[1]=='B') return 0x102;  
+            if (seq[1]=='C') return 0x103;  
+            if (seq[1]=='D') return 0x104;  
         }
         return 27;
     }
@@ -114,19 +109,15 @@ static void fx_draw(const char *cwd, FxEnt *ents, int n, int sel, int top,
                     int rows, int cols, const char *status, const char *status_col) {
     fx_paint_bg(rows, cols);
 
-    /* Title */
     fx_at(2, 2);
     fx_w(FX_YEL"\x1b[1m"); fx_w("── FILE EXPLORER ──"); fx_w("\x1b[22m");
 
-    /* CWD */
     fx_at(3, 2);
     fx_w(FX_FG"path: "FX_DIM2); fx_w(cwd);
 
-    /* Top divider */
     fx_at(4, 1); fx_w(FX_DIM);
     for (int c=0;c<cols;c++) fx_w("─");
 
-    /* List */
     int list_top = 5;
     int list_h   = rows - list_top - 4;
     int visible  = list_h;
@@ -164,10 +155,8 @@ static void fx_draw(const char *cwd, FxEnt *ents, int n, int sel, int top,
         }
     }
 
-    /* Status line */
     if (status) fx_status(rows, cols, status, status_col?status_col:FX_FG);
 
-    /* Footer */
     fx_at(rows-1, 1); fx_w(FX_DIM);
     for (int c=0;c<cols;c++) fx_w("─");
     fx_at(rows, 2);
@@ -184,13 +173,12 @@ static void fx_read_file(const char *path, int rows, int cols) {
         unsigned char c; read(0,&c,1);
         return;
     }
-    /* Title */
+    
     printf("\x1b[1m\x1b[38;5;51m── %s ──\x1b[0m\n", path);
     printf("\x1b[38;5;33m");
     for (int i=0; i<cols-1; i++) putchar('-');
     printf("\x1b[0m\n");
 
-    /* Body — show first ~rows-6 lines */
     char buf[4096]; int n;
     int line_count = 0;
     int max_lines = rows - 6;
@@ -244,10 +232,10 @@ static int b_files(Cmd *c) { (void)c;
         else if (k==13 || k==10) {
             FxEnt *e = &ents[sel];
             if (e->is_dir) {
-                /* Navigate */
+                
                 char newcwd[1024];
                 if (strcmp(e->name, "..") == 0) {
-                    /* parent */
+                    
                     strcpy(newcwd, cwd);
                     char *slash = strrchr(newcwd, '/');
                     if (slash) {
@@ -266,7 +254,7 @@ static int b_files(Cmd *c) { (void)c;
                 if (n < 0) { strcpy(cwd, "/"); n = fx_load(cwd, ents, FX_MAX); }
                 sel = 0; top = 0;
             } else {
-                /* Open in read mode (lower r and Enter both) */
+                
                 char full[2048];
                 snprintf(full, sizeof(full), "%s/%s", cwd, e->name);
                 tcsetattr(0,TCSANOW,&old);
@@ -298,7 +286,7 @@ static int b_files(Cmd *c) { (void)c;
                 snprintf(full, sizeof(full), "%s/%s", cwd, e->name);
                 tcsetattr(0,TCSANOW,&old);
                 fx_w("\x1b[?25h\x1b[0m\x1b[2J\x1b[H");
-                /* Run editor */
+                
                 char line[2200];
                 snprintf(line, sizeof(line), "edit %s", full);
                 run_line(line);
@@ -315,7 +303,7 @@ static int b_files(Cmd *c) { (void)c;
                 strcpy(status, "Cannot delete '..'");
                 status_col = FX_RED;
             } else {
-                /* Confirm */
+                
                 fx_status(rows, cols, "Delete? Y to confirm, anything else to cancel", FX_YEL);
                 fflush(stdout);
                 int conf = fx_readkey(1);

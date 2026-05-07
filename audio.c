@@ -1,22 +1,12 @@
 #include <stdint.h>
-/*
- * audio.c - WAV player using Linux kernel ALSA PCM ioctls directly.
- *
- * Talks to /dev/snd/pcmC0D0p with raw SNDRV_PCM_IOCTL_* calls.
- * No libasound dependency.
- */
 
 #include <sys/ioctl.h>
 #include <sound/asound.h>
 
-
-/* Iterate all controls on the sound card and set every "Switch" to ON,
- * every "Volume" to max. Uses ALSA's control ioctl interface. */
 static void audio_unmute_all(void) {
     int cf = open("/dev/snd/controlC0", O_RDWR);
     if (cf < 0) return;
 
-    /* Get total control count */
     struct snd_ctl_elem_list elist;
     memset(&elist, 0, sizeof(elist));
     if (ioctl(cf, SNDRV_CTL_IOCTL_ELEM_LIST, &elist) < 0) {
@@ -26,7 +16,6 @@ static void audio_unmute_all(void) {
     int count = elist.count;
     if (count <= 0) { close(cf); return; }
 
-    /* Allocate id array */
     struct snd_ctl_elem_id *ids = calloc(count, sizeof(struct snd_ctl_elem_id));
     if (!ids) { close(cf); return; }
 
@@ -48,7 +37,7 @@ static void audio_unmute_all(void) {
         val.id = ids[i];
 
         if (info.type == SNDRV_CTL_ELEM_TYPE_BOOLEAN) {
-            /* Switch — turn ON unless name has "Capture" or "Mic Boost" or similar */
+            
             const char *n = (const char *)info.id.name;
             int turn_on = 1;
             if (strstr(n, "Capture")) turn_on = 0;
@@ -58,10 +47,10 @@ static void audio_unmute_all(void) {
         }
         else if (info.type == SNDRV_CTL_ELEM_TYPE_INTEGER) {
             const char *n = (const char *)info.id.name;
-            /* Skip capture-side and mic boost gain */
+            
             if (strstr(n, "Capture")) continue;
             if (strstr(n, "Mic Boost")) continue;
-            /* Set to max */
+            
             long v = info.value.integer.max;
             for (unsigned j = 0; j < info.count && j < 16; j++)
                 val.value.integer.value[j] = v;
@@ -107,7 +96,6 @@ static int audio_play_wav(const char *path) {
         }
     }
 
-    /* Try card 0 device 0; fall back to others */
     int af = -1;
     const char *devs[] = {
         "/dev/snd/pcmC0D0p",
@@ -122,10 +110,9 @@ static int audio_play_wav(const char *path) {
     }
     if (af < 0) { close(wf); return -4; }
 
-    /* Set HW params via SNDRV_PCM_IOCTL_HW_PARAMS */
     struct snd_pcm_hw_params hw;
     memset(&hw, 0, sizeof(hw));
-    /* Set all masks/intervals to "any" (all bits set) */
+    
     for (int i = 0; i < SNDRV_PCM_HW_PARAM_LAST_MASK - SNDRV_PCM_HW_PARAM_FIRST_MASK + 1; i++) {
         memset(&hw.masks[i], 0xff, sizeof(hw.masks[i]));
     }
@@ -137,7 +124,6 @@ static int audio_play_wav(const char *path) {
     hw.cmask = 0;
     hw.info  = ~0u;
 
-    /* Constrain: ACCESS = INTERLEAVED, FORMAT = S16_LE */
     int access_idx = SNDRV_PCM_HW_PARAM_ACCESS - SNDRV_PCM_HW_PARAM_FIRST_MASK;
     memset(&hw.masks[access_idx], 0, sizeof(hw.masks[access_idx]));
     hw.masks[access_idx].bits[0] = 1u << SNDRV_PCM_ACCESS_RW_INTERLEAVED;
@@ -147,7 +133,6 @@ static int audio_play_wav(const char *path) {
     hw.masks[fmt_idx].bits[SNDRV_PCM_FORMAT_S16_LE / 32]
         |= 1u << (SNDRV_PCM_FORMAT_S16_LE % 32);
 
-    /* Set channels, rate, sample bits */
     #define SET_INTERVAL(name, v) do { \
         int i = (name) - SNDRV_PCM_HW_PARAM_FIRST_INTERVAL; \
         hw.intervals[i].min = (v); hw.intervals[i].max = (v); \
@@ -158,7 +143,6 @@ static int audio_play_wav(const char *path) {
     SET_INTERVAL(SNDRV_PCM_HW_PARAM_RATE, rate);
     SET_INTERVAL(SNDRV_PCM_HW_PARAM_SAMPLE_BITS, bits);
 
-    /* Period and buffer sizes — request reasonable defaults */
     int period_idx = SNDRV_PCM_HW_PARAM_PERIOD_SIZE - SNDRV_PCM_HW_PARAM_FIRST_INTERVAL;
     hw.intervals[period_idx].min = 512;
     hw.intervals[period_idx].max = 8192;
@@ -171,7 +155,6 @@ static int audio_play_wav(const char *path) {
         close(af); close(wf); return -5;
     }
 
-    /* Set SW params (use defaults — need to set start/stop thresholds) */
     struct snd_pcm_sw_params sw;
     memset(&sw, 0, sizeof(sw));
     sw.tstamp_mode = 0;
@@ -182,20 +165,18 @@ static int audio_play_wav(const char *path) {
     sw.silence_threshold = 0;
     sw.silence_size = 0;
     sw.boundary = 0x7fffffff;
-    ioctl(af, SNDRV_PCM_IOCTL_SW_PARAMS, &sw);  /* may fail, that's OK */
+    ioctl(af, SNDRV_PCM_IOCTL_SW_PARAMS, &sw);  
 
-    /* Prepare for playback */
     if (ioctl(af, SNDRV_PCM_IOCTL_PREPARE) < 0) {
         close(af); close(wf); return -6;
     }
 
-    /* Stream PCM data via WRITEI_FRAMES ioctl (or just write()) */
     int frame_bytes = channels * (bits / 8);
     char buf[8192];
     uint32_t remaining = data_size;
     while (remaining > 0) {
         int want = remaining < sizeof(buf) ? remaining : sizeof(buf);
-        /* round down to whole frames */
+        
         want -= want % frame_bytes;
         if (want == 0) break;
         int got = read(wf, buf, want);
@@ -208,7 +189,7 @@ static int audio_play_wav(const char *path) {
 
         int rc = ioctl(af, SNDRV_PCM_IOCTL_WRITEI_FRAMES, &xfer);
         if (rc < 0) {
-            /* Try recovery */
+            
             if (errno == EPIPE) {
                 ioctl(af, SNDRV_PCM_IOCTL_PREPARE);
                 continue;
@@ -218,7 +199,6 @@ static int audio_play_wav(const char *path) {
         remaining -= got;
     }
 
-    /* Drain & close */
     ioctl(af, SNDRV_PCM_IOCTL_DRAIN);
     close(af);
     close(wf);

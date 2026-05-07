@@ -45,8 +45,7 @@
 #define ORG "\x1b[38;5;208m"
 #define PNK "\x1b[38;5;213m"
 
-/* theme colour - used for prompt accents, changed by the `clr` builtin */
-static char g_theme[32] = "\x1b[38;5;51m";  /* default cyan */
+static char g_theme[32] = "\x1b[38;5;51m";  
 
 typedef struct { char *name; char *value; } Alias;
 
@@ -746,18 +745,18 @@ static int b_kpanic(Cmd *c){(void)c;
     tcgetattr(0,&raw);
     raw.c_lflag&=~(ECHO|ICANON);
     tcsetattr(0,TCSAFLUSH,&raw);
-    /* red screen */
+    
     int cols=80,rows=24;
     struct winsize ws;
     if(ioctl(1,TIOCGWINSZ,&ws)==0&&ws.ws_col&&ws.ws_row){cols=ws.ws_col;rows=ws.ws_row;}
-    /* fill every cell with red background */
+    
     write(1,"[2J[H[41m[97m[1m",21);
     for(int i=0;i<rows;i++){
         char mv[16]; snprintf(mv,16,"[%d;1H",i+1); write(1,mv,strlen(mv));
         for(int j=0;j<cols;j++) write(1," ",1);
     }
     write(1,"[H",3);
-    /* centre the panic message */
+    
     const char *lines[]={
         "[ TRIUMPH OS KERNEL PANIC ]",
         "",
@@ -790,14 +789,14 @@ static int b_kpanic(Cmd *c){(void)c;
         write(1,lines[i],llen);
     }
     fflush(stdout);
-    /* flash effect */
+    
     for(int f=0;f<6;f++){
         usleep(200000);
         write(1,f%2?"[41m":"[48;5;196m",f%2?5:11);
     }
-    /* wait for keypress */
+    
     unsigned char dummy; read(0,&dummy,1);
-    /* reboot */
+    
     write(1,"[0m[2J[H",12);
     sync();
     reboot(RB_AUTOBOOT);
@@ -884,7 +883,7 @@ int main(int argc,char *argv[]){
         system("mount -t devtmpfs dev /dev  2>/dev/null");
         system("mount -t tmpfs  tmp  /tmp  2>/dev/null");}
     show_banner();
-    /* Boot directly into the fullscreen menu */
+    
     { Cmd dc={0}; b_menu(&dc); }
     char line[SH_MAX_INPUT];
     while(running){

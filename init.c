@@ -17,8 +17,6 @@
 #include "splash.c"
 #include "audio.c"
 
-
-/* Load a kernel module via the init_module syscall */
 #include <sys/syscall.h>
 static int load_module(const char *path, char *errbuf, size_t errsz) {
     int fd = open(path, O_RDONLY);
@@ -115,7 +113,6 @@ int main(void){
 
     open_tty();
 
-    /* Load Realtek PHY driver first (soft dep of r8169) */
     {
         char err[200] = "";
         char p1[] = "/lib/modules/6.8.0-111-generic/kernel/drivers/net/phy/realtek.ko";
@@ -123,7 +120,6 @@ int main(void){
         else { char b[256]; snprintf(b,sizeof(b),"realtek PHY load failed: %s",err); kmsg(b); }
     }
 
-    /* Load Realtek r8169 ethernet driver — works for ThinkPad E470 and others */
     {
         char path[] = "/lib/modules/6.8.0-111-generic/kernel/drivers/net/ethernet/realtek/r8169.ko";
         char err[200] = "";
@@ -137,7 +133,6 @@ int main(void){
         }
     }
 
-    /* Load HDA audio stack — order matters */
     {
         const char *audio_modules[] = {
             "/lib/modules/6.8.0-111-generic/kernel/sound/soundcore.ko",
@@ -175,10 +170,8 @@ int main(void){
         kmsg("audio modules loaded");
     }
 
-    /* Give kernel a moment to bind audio devices and create /dev/snd entries */
     sleep(2);
 
-    /* Start boot WAV in background — plays during the splash */
     audio_play_wav_async("/boot.wav");
 
     splash_show();

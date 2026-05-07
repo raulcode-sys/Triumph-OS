@@ -57,7 +57,7 @@ static void tb_lock(TB *t) {
         if (r >= 0 && r < TB_H && c >= 0 && c < TB_W)
             t->board[r][c] = t->ptype + 1;
     }
-    pc_play(SND_THUNK);
+    audio_play_wav_async("/sfx.wav");
 }
 
 static void tb_clear(TB *t) {

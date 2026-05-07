@@ -13,8 +13,8 @@ typedef struct {
     int highscore;
     int dead;
     int paused;
-    int obstacles[8];  /* x positions */
-    int obs_type[8];   /* 0=cactus, 1=bird */
+    int obstacles[8];  
+    int obs_type[8];   
     int frame;
     float speed;
 } CkState;
@@ -31,9 +31,8 @@ static void ck_init(CkState *s) {
     s->obs_type[0] = 0;
 }
 
-/* 3-frame chicken sprite */
 static const char *CHICKEN_RUN[2][3] = {
-    { "\x1b[38;5;220m▄\x1b[38;5;231m◢\x1b[38;5;196m▼\x1b[0m",     /* body + comb */
+    { "\x1b[38;5;220m▄\x1b[38;5;231m◢\x1b[38;5;196m▼\x1b[0m",     
       "\x1b[38;5;220m▀\x1b[38;5;220m▙\x1b[38;5;226m◤\x1b[0m",
       "\x1b[38;5;208m╱\x1b[0m \x1b[38;5;208m╲\x1b[0m" },
     { "\x1b[38;5;220m▄\x1b[38;5;231m◢\x1b[38;5;196m▼\x1b[0m",
@@ -54,7 +53,6 @@ static void ck_draw_chicken(CkState *s, int ox, int oy) {
     if (s->jumping) sprite = CHICKEN_JUMP;
     else sprite = CHICKEN_RUN[(s->frame/4) % 2];
 
-    /* 3 rows tall */
     ck_gotoxy(cx, cy-2); ck_puts(sprite[0]);
     ck_gotoxy(cx, cy-1); ck_puts(sprite[1]);
     ck_gotoxy(cx, cy);   ck_puts(sprite[2]);
@@ -78,7 +76,6 @@ static void ck_draw(CkState *s) {
 
     ck_puts("\x1b[2J");
 
-    /* header */
     ck_gotoxy(ox, oy-2);
     printf("\x1b[1m\x1b[38;5;51m Triumph Chicken \x1b[0m"
            "\x1b[38;5;245m  Score: \x1b[1m\x1b[38;5;226m%-5d \x1b[0m"
@@ -86,7 +83,6 @@ static void ck_draw(CkState *s) {
            "\x1b[38;5;245m  SPACE jump  ^P pause  ^X exit\x1b[0m",
            s->score, s->highscore);
 
-    /* sky (dots for stars, clouds) */
     for (int y=0; y<CK_H-1; y++) {
         ck_gotoxy(ox, oy+y);
         for (int x=0; x<CK_W; x++) {
@@ -98,7 +94,6 @@ static void ck_draw(CkState *s) {
         }
     }
 
-    /* ground */
     ck_gotoxy(ox, oy+CK_H);
     for (int x=0; x<CK_W; x++) {
         int p = (x + s->score/2) % 6;
@@ -107,7 +102,6 @@ static void ck_draw(CkState *s) {
         else           ck_puts("\x1b[38;5;94m═\x1b[0m");
     }
 
-    /* obstacles */
     for (int i=0; i<8; i++) {
         if (s->obstacles[i] < 0) continue;
         int x = ox + s->obstacles[i];
@@ -116,7 +110,6 @@ static void ck_draw(CkState *s) {
         else ck_draw_bird(x, oy+CK_GROUND, s->frame);
     }
 
-    /* chicken - pass oy so function computes cy = oy + s->y */
     ck_draw_chicken(s, ox, oy);
 
     if (s->paused) {
@@ -133,17 +126,17 @@ static void ck_draw(CkState *s) {
 }
 
 static int ck_collide(CkState *s) {
-    int cx = 4;  /* chicken x relative to play area */
+    int cx = 4;  
     int cy = (int)s->y;
     for (int i=0; i<8; i++) {
         if (s->obstacles[i] < 0) continue;
         int ox_pos = s->obstacles[i];
         if (ox_pos < cx-1 || ox_pos > cx+1) continue;
         if (s->obs_type[i] == 0) {
-            /* cactus on ground - only hits if on ground */
+            
             if (cy >= CK_GROUND - 1) return 1;
         } else {
-            /* bird flies high - only hits if jumping */
+            
             if (cy <= CK_GROUND - 2) return 1;
         }
     }
@@ -154,7 +147,6 @@ static void ck_tick(CkState *s) {
     if (s->paused || s->dead) return;
     s->frame++;
 
-    /* physics - gravity */
     if (s->jumping) {
         s->y += s->vy;
         s->vy += 0.25f;
@@ -165,7 +157,6 @@ static void ck_tick(CkState *s) {
         }
     }
 
-    /* move obstacles */
     for (int i=0; i<8; i++) {
         if (s->obstacles[i] < 0) continue;
         s->obstacles[i] -= (int)s->speed;
@@ -175,7 +166,6 @@ static void ck_tick(CkState *s) {
         }
     }
 
-    /* spawn new obstacle */
     int farthest = 0;
     for (int i=0; i<8; i++) {
         if (s->obstacles[i] > farthest) farthest = s->obstacles[i];
@@ -190,11 +180,9 @@ static void ck_tick(CkState *s) {
         }
     }
 
-    /* speed up */
     s->speed = 1.0f + (float)s->score * 0.02f;
     if (s->speed > 3.0f) s->speed = 3.0f;
 
-    /* collision */
     if (ck_collide(s)) {
         s->dead = 1;
         if (s->score > s->highscore) s->highscore = s->score;
@@ -241,7 +229,7 @@ static int b_chicken(Cmd *c) { (void)c;
                 if (!s.jumping && !s.dead) {
                     s.jumping = 1;
                     s.vy = -2.0f;
-                    pc_play(SND_JUMP);
+                    audio_play_wav_async("/sfx.wav");
                 }
                 if (s.dead) goto quit;
             }

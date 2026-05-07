@@ -1,14 +1,4 @@
-/*
- * Triumph Web — minimal HTTP browser.
- *
- * Detects ethernet, runs a tiny built-in DHCP client to get an IP,
- * then fetches HTTP URLs and renders them as text (lynx-style, simplified).
- *
- * If no ethernet is connected: shows the "no internet" message.
- *
- * HTTP only — HTTPS would need a full TLS stack (OpenSSL, mbedTLS) which we
- * deliberately don't bundle.
- */
+
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -39,7 +29,6 @@
 #define WB_GRN "\x1b[38;5;82m"
 #define WB_RED "\x1b[38;5;196m"
 
-/* URL history — last 16 URLs visited */
 #define WB_HIST_MAX 16
 static char wb_history[WB_HIST_MAX][256];
 static int  wb_history_n = 0;
@@ -103,7 +92,7 @@ static int wb_load_module(const char *path, char *err, size_t errsz) {
     close(fd);
     long rc = syscall(SYS_init_module, data, (unsigned long)st.st_size, "");
     free(data);
-    if (rc < 0 && errno != 17 /* EEXIST */) {
+    if (rc < 0 && errno != 17 ) {
         snprintf(err, errsz, "init_module: %s (errno %d)", strerror(errno), errno);
         return -1;
     }
@@ -118,8 +107,6 @@ static void wb_paint_bg(int rows, int cols) {
     for(int r=0;r<rows;r++){for(int c=0;c<cols;c++)wb_w(" ");if(r<rows-1)wb_w("\r\n");}
 }
 
-/* ── Find ethernet interface ────────────────────────────────────────────── */
-/* Bring interface UP via ioctl */
 static void iface_up(const char *name) {
     int s = socket(AF_INET, SOCK_DGRAM, 0);
     if (s < 0) return;
@@ -148,15 +135,14 @@ static int iface_carrier(const char *name) {
     return buf[0]=='1';
 }
 
-/* Try loading common ethernet drivers that we bundled */
 static void try_load_drivers(void) {
     static int loaded = 0;
     if (loaded) return;
     loaded = 1;
     char err[256];
-    /* Try Realtek r8169 (ThinkPad E470, many laptops) */
+    
     wb_load_module("/lib/modules/6.8.0-111-generic/kernel/drivers/net/ethernet/realtek/r8169.ko", err, sizeof(err));
-    /* Give the kernel ~2s to enumerate PCI and create interfaces */
+    
     for (int i=0; i<20; i++) {
         DIR *d = opendir("/sys/class/net");
         int count = 0;
@@ -174,8 +160,6 @@ static void try_load_drivers(void) {
     }
 }
 
-/* Bring up every non-loopback, non-wireless interface, wait for carrier,
- * return the first one with link. */
 static int find_ethernet(char *ifname, size_t ifname_sz) {
     try_load_drivers();
     char found[8][32]; int nfound = 0;
@@ -193,10 +177,8 @@ static int find_ethernet(char *ifname, size_t ifname_sz) {
     closedir(d);
     if (nfound == 0) return -1;
 
-    /* Bring them all up */
     for (int i=0; i<nfound; i++) iface_up(found[i]);
 
-    /* Poll for carrier — up to 5 seconds */
     for (int t=0; t<50; t++) {
         for (int i=0; i<nfound; i++) {
             if (iface_carrier(found[i])) {
@@ -208,21 +190,17 @@ static int find_ethernet(char *ifname, size_t ifname_sz) {
         usleep(100000);
     }
 
-    /* No link detected — but if there is exactly ONE wired interface,
-     * try DHCP on it anyway (some NICs never report carrier correctly). */
     if (nfound == 1) {
         strncpy(ifname, found[0], ifname_sz-1);
         ifname[ifname_sz-1] = 0;
         return 0;
     }
 
-    /* Multiple wired interfaces, none with link — pick the first as best guess */
     strncpy(ifname, found[0], ifname_sz-1);
     ifname[ifname_sz-1] = 0;
     return 0;
 }
 
-/* Show diagnostics: list every interface and its state */
 static void wb_show_diag(int rows, int cols) {
     wb_paint_bg(rows, cols);
     wb_at(2, (cols-20)/2);
@@ -265,7 +243,6 @@ static void wb_show_diag(int rows, int cols) {
         closedir(d);
     }
 
-    /* Show driver load error if any */
     y += 2;
     int errfd = open("/tmp/r8169_error.txt", O_RDONLY);
     if (errfd >= 0) {
@@ -279,7 +256,6 @@ static void wb_show_diag(int rows, int cols) {
         wb_at(y++, 4); wb_w(WB_GRN "Driver loaded OK (no error file)");
     }
 
-    /* Show last few dmesg lines */
     int kfd = open("/dev/kmsg", O_RDONLY|O_NONBLOCK);
     if (kfd >= 0) {
         wb_at(y++, 4); wb_w(WB_YEL "\x1b[1mRecent kernel messages:\x1b[22m");
@@ -287,7 +263,7 @@ static void wb_show_diag(int rows, int cols) {
         close(kfd);
         if (kn > 0) {
             kbuf[kn] = 0;
-            /* Print last ~10 lines containing r8169 or eth */
+            
             char *p = kbuf;
             int shown = 0;
             while (*p && shown < 6 && y < rows-3) {
@@ -296,12 +272,12 @@ static void wb_show_diag(int rows, int cols) {
                 *eol = 0;
                 if (strstr(p, "r8169") || strstr(p, "eth") || strstr(p, "Realtek") ||
                     strstr(p, "PCI")   || strstr(p, "init_module")) {
-                    /* find body after timestamp prefix like "<6>4,123,..." */
+                    
                     char *body = strchr(p, ';');
                     if (body) body++;
                     else body = p;
                     wb_at(y++, 4); wb_w(WB_DIM2);
-                    /* truncate to fit */
+                    
                     int max = cols - 6;
                     if ((int)strlen(body) > max) body[max] = 0;
                     wb_w(body);
@@ -318,11 +294,6 @@ static void wb_show_diag(int rows, int cols) {
     unsigned char c; read(0, &c, 1);
 }
 
-/* ── Tiny DHCP client ───────────────────────────────────────────────────── *
- * Uses raw sockets to broadcast a DHCPDISCOVER, accept the OFFER, send
- * REQUEST, accept ACK. Sets the IP, gateway and DNS.
- */
-
 struct dhcp_pkt {
     uint8_t op, htype, hlen, hops;
     uint32_t xid;
@@ -337,7 +308,7 @@ struct dhcp_pkt {
 
 static int dhcp_send_raw(int sock, int ifindex, const uint8_t *mac,
                          struct dhcp_pkt *p, size_t plen) {
-    /* Build full IP+UDP+DHCP packet for raw sending */
+    
     uint8_t buf[1500] = {0};
     struct iphdr  *ip  = (struct iphdr*)buf;
     struct udphdr *udp = (struct udphdr*)(buf + sizeof(*ip));
@@ -360,7 +331,7 @@ static int dhcp_send_raw(int sock, int ifindex, const uint8_t *mac,
     ip->protocol = IPPROTO_UDP;
     ip->saddr    = 0;
     ip->daddr    = 0xFFFFFFFF;
-    /* checksum */
+    
     uint16_t *w = (uint16_t*)ip;
     uint32_t sum = 0;
     for (int i=0; i<5*2; i++) sum += w[i];
@@ -385,15 +356,12 @@ static int dhcp_get(const char *ifname, uint32_t *ip_out, uint32_t *gw_out, uint
     struct ifreq ifr; memset(&ifr,0,sizeof(ifr));
     strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
 
-    /* Get index */
     if (ioctl(sock, SIOCGIFINDEX, &ifr) < 0) { close(sock); return -1; }
     int ifindex = ifr.ifr_ifindex;
 
-    /* Get MAC */
     if (ioctl(sock, SIOCGIFHWADDR, &ifr) < 0) { close(sock); return -1; }
     uint8_t mac[6]; memcpy(mac, ifr.ifr_hwaddr.sa_data, 6);
 
-    /* Build a simpler approach: use a UDP socket with SO_BROADCAST + SO_BINDTODEVICE */
     close(sock);
     sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock < 0) return -1;
@@ -415,7 +383,6 @@ static int dhcp_get(const char *ifname, uint32_t *ip_out, uint32_t *gw_out, uint
 
     uint32_t xid = (uint32_t)time(NULL) ^ getpid();
 
-    /* DISCOVER */
     struct dhcp_pkt disc = {0};
     disc.op = 1; disc.htype = 1; disc.hlen = 6;
     disc.xid = xid;
@@ -423,12 +390,12 @@ static int dhcp_get(const char *ifname, uint32_t *ip_out, uint32_t *gw_out, uint
     memcpy(disc.chaddr, mac, 6);
     disc.magic = htonl(0x63825363);
     int o = 0;
-    disc.options[o++] = 53; disc.options[o++] = 1; disc.options[o++] = 1;  /* DHCPDISCOVER */
-    disc.options[o++] = 55; disc.options[o++] = 4;                          /* param req */
-    disc.options[o++] = 1;  /* subnet */
-    disc.options[o++] = 3;  /* router */
-    disc.options[o++] = 6;  /* DNS */
-    disc.options[o++] = 51; /* lease time */
+    disc.options[o++] = 53; disc.options[o++] = 1; disc.options[o++] = 1;  
+    disc.options[o++] = 55; disc.options[o++] = 4;                          
+    disc.options[o++] = 1;  
+    disc.options[o++] = 3;  
+    disc.options[o++] = 6;  
+    disc.options[o++] = 51; 
     disc.options[o++] = 0xFF;
 
     struct sockaddr_in dst = {0};
@@ -441,7 +408,6 @@ static int dhcp_get(const char *ifname, uint32_t *ip_out, uint32_t *gw_out, uint
         close(sock); return -1;
     }
 
-    /* Wait for OFFER */
     struct dhcp_pkt resp;
     int n;
     uint32_t offered_ip = 0, server_id = 0, gw = 0, dns = 0;
@@ -452,7 +418,7 @@ static int dhcp_get(const char *ifname, uint32_t *ip_out, uint32_t *gw_out, uint
         if (resp.xid != xid) continue;
         if (resp.op != 2) continue;
         offered_ip = resp.yiaddr;
-        /* parse options */
+        
         for (int i=0; i<308; ) {
             uint8_t code = resp.options[i++];
             if (code == 0) continue;
@@ -468,7 +434,6 @@ static int dhcp_get(const char *ifname, uint32_t *ip_out, uint32_t *gw_out, uint
     }
     if (!got_offer) { close(sock); return -1; }
 
-    /* REQUEST */
     struct dhcp_pkt req = {0};
     req.op = 1; req.htype = 1; req.hlen = 6;
     req.xid = xid;
@@ -476,17 +441,16 @@ static int dhcp_get(const char *ifname, uint32_t *ip_out, uint32_t *gw_out, uint
     memcpy(req.chaddr, mac, 6);
     req.magic = htonl(0x63825363);
     o = 0;
-    req.options[o++] = 53; req.options[o++] = 1; req.options[o++] = 3;  /* REQUEST */
-    req.options[o++] = 50; req.options[o++] = 4;                         /* requested IP */
+    req.options[o++] = 53; req.options[o++] = 1; req.options[o++] = 3;  
+    req.options[o++] = 50; req.options[o++] = 4;                         
     memcpy(&req.options[o], &offered_ip, 4); o += 4;
-    req.options[o++] = 54; req.options[o++] = 4;                         /* server id */
+    req.options[o++] = 54; req.options[o++] = 4;                         
     memcpy(&req.options[o], &server_id, 4); o += 4;
     req.options[o++] = 0xFF;
 
     sendto(sock, &req, sizeof(req), 0,
            (struct sockaddr*)&dst, sizeof(dst));
 
-    /* Wait for ACK */
     int got_ack = 0;
     for (int try=0; try<3 && !got_ack; try++) {
         n = recv(sock, &resp, sizeof(resp), 0);
@@ -511,29 +475,24 @@ static int dhcp_get(const char *ifname, uint32_t *ip_out, uint32_t *gw_out, uint
     return 0;
 }
 
-/* Configure interface using ioctl: set IP and bring up */
 static int net_set_ip(const char *ifname, uint32_t ip, uint32_t gw) {
     int s = socket(AF_INET, SOCK_DGRAM, 0);
     if (s < 0) return -1;
     struct ifreq ifr; memset(&ifr,0,sizeof(ifr));
     strncpy(ifr.ifr_name, ifname, IFNAMSIZ-1);
 
-    /* address */
     struct sockaddr_in *sin = (struct sockaddr_in*)&ifr.ifr_addr;
     sin->sin_family = AF_INET;
     sin->sin_addr.s_addr = ip;
     if (ioctl(s, SIOCSIFADDR, &ifr) < 0) { close(s); return -1; }
 
-    /* netmask /24 */
     sin->sin_addr.s_addr = htonl(0xFFFFFF00);
     ioctl(s, SIOCSIFNETMASK, &ifr);
 
-    /* up + running */
     if (ioctl(s, SIOCGIFFLAGS, &ifr) < 0) { close(s); return -1; }
     ifr.ifr_flags |= IFF_UP | IFF_RUNNING;
     ioctl(s, SIOCSIFFLAGS, &ifr);
 
-    /* default route */
     if (gw) {
         struct rtentry rt;
         memset(&rt, 0, sizeof(rt));
@@ -562,8 +521,6 @@ static void net_set_dns(uint32_t dns) {
     close(fd);
 }
 
-/* ── HTTP fetch ─────────────────────────────────────────────────────────── */
-/* HTTPS GET via mbedTLS — supports TLS 1.2 (HTTP/1.1 only). */
 static int https_get(const char *host, int port, const char *path,
                      char *out, size_t outsz) {
     int ret = -1;
@@ -586,9 +543,8 @@ static int https_get(const char *host, int port, const char *path,
                               (const unsigned char*)pers, strlen(pers)) != 0)
         goto cleanup;
 
-    /* Load CA bundle (PEM format) */
     if (mbedtls_x509_crt_parse_file(&cacert, "/etc/ssl/certs/ca-certificates.crt") < 0) {
-        /* try without verification if bundle missing */
+        
     }
 
     char portstr[8]; snprintf(portstr, sizeof(portstr), "%d", port);
@@ -600,7 +556,6 @@ static int https_get(const char *host, int port, const char *path,
                                     MBEDTLS_SSL_PRESET_DEFAULT) != 0)
         goto cleanup;
 
-    /* Optional verification: skip if no CA bundle was loaded */
     mbedtls_ssl_conf_authmode(&conf, MBEDTLS_SSL_VERIFY_NONE);
     mbedtls_ssl_conf_ca_chain(&conf, &cacert, NULL);
     mbedtls_ssl_conf_rng(&conf, mbedtls_ctr_drbg_random, &ctr_drbg);
@@ -695,7 +650,6 @@ static int http_get(const char *host, int port, const char *path,
     return (int)got;
 }
 
-/* Strip HTML tags and decode common entities */
 static void html_to_text(const char *html, char *out, size_t outsz) {
     size_t o = 0;
     int in_tag = 0, in_script = 0, in_style = 0, in_ws = 0;
@@ -753,7 +707,6 @@ static void html_to_text(const char *html, char *out, size_t outsz) {
     out[o] = 0;
 }
 
-/* ── UI ─────────────────────────────────────────────────────────────────── */
 static void wb_show_no_internet(int rows, int cols) {
     wb_paint_bg(rows, cols);
 
@@ -808,8 +761,8 @@ static int wb_readkey(int blocking) {
         tcsetattr(0,TCSANOW,&cur);
         if (n<=0) return 27;
         if (n>=2 && seq[0]=='[') {
-            if (seq[1]=='A') return 0x101; /* up */
-            if (seq[1]=='B') return 0x102; /* down */
+            if (seq[1]=='A') return 0x101; 
+            if (seq[1]=='B') return 0x102; 
             if (seq[1]=='C') return 0x103;
             if (seq[1]=='D') return 0x104;
         }
@@ -819,7 +772,7 @@ static int wb_readkey(int blocking) {
 }
 
 static void wb_url_input(char *url, size_t sz, int rows, int cols) {
-    /* Already at appropriate row — draw input box */
+    
     int y = rows / 2;
     int boxw = 60;
     int x = (cols - boxw) / 2;
@@ -833,7 +786,7 @@ static void wb_url_input(char *url, size_t sz, int rows, int cols) {
     wb_w(WB_FG "│ "); wb_w(WB_YEL);
     char input[256] = "http://";
     int ilen = 7;
-    /* draw initial */
+    
     char pad[80]; snprintf(pad,sizeof(pad),"%-*s", boxw-4, input);
     wb_w(pad);
     wb_at(y+1, x+boxw-1); wb_w(WB_FG"│");
@@ -847,19 +800,19 @@ static void wb_url_input(char *url, size_t sz, int rows, int cols) {
     wb_w("\x1b[?25h");
     fflush(stdout);
 
-    int hist_idx = -1;  /* -1 means "current input", 0..n-1 are history entries */
+    int hist_idx = -1;  
     while (1) {
         int k = wb_readkey(1);
         if (k == 27)              { url[0]=0; break; }
         if (k == 13 || k == 10)   { strncpy(url, input, sz-1); url[sz-1]=0; break; }
-        if (k == 0x101) {  /* up — older entry */
+        if (k == 0x101) {  
             if (wb_history_n > 0 && hist_idx < wb_history_n - 1) {
                 hist_idx++;
                 strncpy(input, wb_history[hist_idx], sizeof(input)-1);
                 input[sizeof(input)-1] = 0;
                 ilen = strlen(input);
             }
-        } else if (k == 0x102) {  /* down — newer */
+        } else if (k == 0x102) {  
             if (hist_idx > 0) {
                 hist_idx--;
                 strncpy(input, wb_history[hist_idx], sizeof(input)-1);
@@ -888,7 +841,6 @@ static void wb_url_input(char *url, size_t sz, int rows, int cols) {
     wb_w("\x1b[?25l");
 }
 
-/* parse url scheme://host[:port]/path */
 static int parse_url(const char *url, char *host, int hostsz, int *port, char *path, int pathsz) {
     const char *p = url;
     int is_https = 0;
@@ -906,7 +858,6 @@ static int parse_url(const char *url, char *host, int hostsz, int *port, char *p
     return 0;
 }
 
-/* Reflow text with word-wrap and render */
 static void render_text(const char *text, int rows, int cols) {
     wb_paint_bg(rows, cols);
     wb_at(1, 2);
@@ -923,7 +874,7 @@ static void render_text(const char *text, int rows, int cols) {
 
     const char *p = text;
     while (*p && y < max_y) {
-        /* find next word */
+        
         while (*p == ' ' && *p) p++;
         const char *w = p;
         int wlen = 0;
@@ -967,7 +918,6 @@ static int b_web(Cmd *c) { (void)c;
 
     wb_history_load();
 
-    /* 1. Find ethernet */
     char ifname[32];
     if (find_ethernet(ifname, sizeof(ifname)) < 0) {
         wb_show_no_internet(rows, cols);
@@ -976,13 +926,11 @@ static int b_web(Cmd *c) { (void)c;
         return 0;
     }
 
-    /* 2. Connecting message */
     wb_paint_bg(rows, cols);
     wb_at(rows/2 - 1, (cols-30)/2);
     wb_w(WB_FG"\x1b[1mConnecting via "WB_YEL); wb_w(ifname); wb_w(WB_FG"...\x1b[22m");
     fflush(stdout);
 
-    /* 3. Bring interface up first */
     {
         int s = socket(AF_INET, SOCK_DGRAM, 0);
         if (s >= 0) {
@@ -996,7 +944,6 @@ static int b_web(Cmd *c) { (void)c;
     }
     sleep(1);
 
-    /* 4. DHCP */
     uint32_t ip=0, gw=0, dns=0;
     if (dhcp_get(ifname, &ip, &gw, &dns) < 0) {
         wb_paint_bg(rows, cols);
@@ -1015,7 +962,6 @@ static int b_web(Cmd *c) { (void)c;
     net_set_ip(ifname, ip, gw);
     net_set_dns(dns);
 
-    /* 5. Show "connected" briefly */
     wb_paint_bg(rows, cols);
     char ipstr[64]; struct in_addr a; a.s_addr = ip;
     snprintf(ipstr, sizeof(ipstr), "Connected: IP %s", inet_ntoa(a));
@@ -1024,7 +970,6 @@ static int b_web(Cmd *c) { (void)c;
     fflush(stdout);
     sleep(1);
 
-    /* 6. URL input loop */
     while (1) {
         wb_paint_bg(rows, cols);
         wb_at(2, (cols-12)/2);
@@ -1080,7 +1025,6 @@ static int b_web(Cmd *c) { (void)c;
             continue;
         }
 
-        /* Skip headers — find blank line */
         char *body = strstr(page, "\r\n\r\n");
         if (body) body += 4; else body = page;
         html_to_text(body, text, 256*1024);

@@ -1,8 +1,4 @@
-/*
- * Triumph fullscreen menu launcher.
- * Three-column layout: help bar left, menu center, fetch right.
- * Arrow keys + Enter to select. Loops back here after every program exits.
- */
+
 
 #define MN_BG  "\x1b[48;5;17m"
 #define MN_FG  "\x1b[38;5;51m"
@@ -13,7 +9,7 @@
 #define MN_GRN "\x1b[38;5;82m"
 #define MN_RED "\x1b[38;5;196m"
 
-static int b_calcui(Cmd *c);  /* forward */
+static int b_calcui(Cmd *c);  
 
 static const struct { const char *label; const char *desc; const char *cmd; int kind; } MNU[] = {
     {"Snake",      "Classic snake game",            "snake",   0},
@@ -68,17 +64,16 @@ static const char *MN_HELP_LINES[] = {
 static void mn_w(const char *s) { write(1, s, strlen(s)); }
 static void mn_at(int r, int c) { char b[24]; snprintf(b,24,"\x1b[%d;%dH",r,c); mn_w(b); }
 
-/* Returns -2 on timeout, 0 on no key, otherwise the key. */
 static int mn_readkey_timeout(int seconds) {
     fd_set fds;
     FD_ZERO(&fds); FD_SET(0, &fds);
     struct timeval tv = { seconds, 0 };
     int r = select(1, &fds, NULL, NULL, &tv);
-    if (r <= 0) return -2;  /* timeout */
+    if (r <= 0) return -2;  
     unsigned char c;
     if (read(0,&c,1)<=0) return 0;
     if (c==0x1b) {
-        /* peek for sequence with short timeout */
+        
         struct timeval tv2 = { 0, 100000 };
         FD_ZERO(&fds); FD_SET(0,&fds);
         if (select(1,&fds,NULL,NULL,&tv2) <= 0) return 27;
@@ -119,7 +114,6 @@ static void mn_fetch_lines(char out[][64], int *n_out) {
     char host[64]=""; gethostname(host, sizeof(host));
     const char *user = getenv("USER"); if (!user) user = "root";
 
-    /* T logo - fits in ~22 char column */
     snprintf(out[n++], 64, "TTTTTTTTTTTTTTTTTTTTT");
     snprintf(out[n++], 64, "T:::::::::::::::::::T");
     snprintf(out[n++], 64, "T:::::TT:::::TT:::::T");
@@ -196,7 +190,6 @@ static void mn_draw(int sel, int rows, int cols) {
     if (center_w < 30) center_w = 30;
     int right_x = cols - right_w - 1;
 
-    /* Left col: help */
     for (int i=0; MN_HELP_LINES[i] && i<col_h; i++) {
         mn_at(col_top + i, 2);
         const char *line = MN_HELP_LINES[i];
@@ -209,7 +202,6 @@ static void mn_draw(int sel, int rows, int cols) {
         }
     }
 
-    /* Right col: fetch with logo on top */
     char info[36][64];
     int n_info = 0;
     mn_fetch_lines(info, &n_info);
@@ -219,9 +211,9 @@ static void mn_draw(int sel, int rows, int cols) {
         if (line[0]=='-' && line[1]=='-') {
             mn_w(MN_YEL); mn_w(line);
         } else if (line[0]==0) {
-            /* blank */
+            
         } else if (line[0]=='T' || (line[0]==' ' && (line[7]=='T' || line[5]=='T'))) {
-            /* logo line — print in bright cyan, bold */
+            
             mn_w(MN_FG"\x1b[1m"); mn_w(line); mn_w("\x1b[22m");
         } else {
             mn_w(MN_FG);
@@ -237,7 +229,6 @@ static void mn_draw(int sel, int rows, int cols) {
         }
     }
 
-    /* Vertical separators */
     for (int y=col_top-1; y<col_top+col_h+1; y++) {
         mn_at(y, left_w + 1);
         mn_w(MN_DIM); mn_w("│");
@@ -245,7 +236,6 @@ static void mn_draw(int sel, int rows, int cols) {
         mn_w("│");
     }
 
-    /* Centre col: menu */
     int item_w = center_w - 2; if (item_w>50) item_w=50;
     int my = col_top + (col_h - MNU_N) / 2;
     if (my < col_top + 2) my = col_top + 2;
@@ -273,7 +263,6 @@ static void mn_draw(int sel, int rows, int cols) {
         }
     }
 
-    /* Footer */
     mn_at(rows-1, 1);
     mn_w(MN_DIM);
     for (int c=0;c<cols;c++) mn_w("═");
@@ -301,7 +290,7 @@ static int b_menu(Cmd *c) { (void)c;
     while (1) {
         mn_draw(sel, rows, cols);
         int k = mn_readkey_timeout(1);
-        if (k == -2) continue;  /* timeout — just redraw */
+        if (k == -2) continue;  
         if      (k=='U' || k=='k' || k=='w' || k=='W') sel = (sel - 1 + MNU_N) % MNU_N;
         else if (k=='D' || k=='j' || k=='s' || k=='S') sel = (sel + 1) % MNU_N;
         else if (k==13 || k==10) {

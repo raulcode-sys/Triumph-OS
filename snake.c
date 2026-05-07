@@ -154,7 +154,7 @@ static int b_snake(Cmd *cmd) {
             s.body[0] = head;
             s.len++;
 
-            if (ate) { s.score += 10; sn_place_food(&s); pc_play(SND_NOM); }
+            if (ate) { s.score += 10; sn_place_food(&s); audio_play_wav_async("/sfx.wav"); }
 
             sn_draw(&s);
             usleep(SN_TICK);

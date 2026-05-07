@@ -41,7 +41,6 @@ static void pg_draw(PgState *s) {
            "\x1b[38;5;245m  P2:\x1b[1m\x1b[38;5;226m%d\x1b[0m"
            "\x1b[38;5;245m  W/S move  ^P pause  ^X exit\x1b[0m", s->s1, s->s2);
 
-    /* frame */
     pg_gotoxy(ox-1, oy);
     pg_puts("\x1b[38;5;240m╔"); for(int x=0;x<PG_W;x++) pg_puts("═"); pg_puts("╗");
     for (int y=1; y<=PG_H; y++) {
@@ -51,13 +50,11 @@ static void pg_draw(PgState *s) {
     pg_gotoxy(ox-1, oy+PG_H+1);
     pg_puts("╚"); for(int x=0;x<PG_W;x++) pg_puts("═"); pg_puts("╝\x1b[0m");
 
-    /* centre line */
     for (int y=1; y<=PG_H; y+=2) {
         pg_gotoxy(ox+PG_W/2, oy+y);
         pg_puts("\x1b[38;5;240m│\x1b[0m");
     }
 
-    /* paddles */
     for (int i=0; i<PG_PADDLE; i++) {
         pg_gotoxy(ox+1, oy+s->p1y+i);
         pg_puts("\x1b[38;5;51m\x1b[1m█\x1b[0m");
@@ -65,7 +62,6 @@ static void pg_draw(PgState *s) {
         pg_puts("\x1b[38;5;196m\x1b[1m█\x1b[0m");
     }
 
-    /* ball */
     int bx = (int)s->bx, by = (int)s->by;
     if (bx>=1 && bx<=PG_W && by>=1 && by<=PG_H) {
         pg_gotoxy(ox+bx, oy+by);
@@ -91,46 +87,42 @@ static void pg_tick(PgState *s) {
     s->bx += s->vx;
     s->by += s->vy;
 
-    /* top/bottom bounce */
     if (s->by < 1)    { s->by = 1;    s->vy = -s->vy; pc_tone(440, 15); }
     if (s->by > PG_H) { s->by = PG_H; s->vy = -s->vy; pc_tone(440, 15); }
 
-    /* paddle collision — left */
     if (s->bx <= 2 && s->vx < 0) {
         int py = (int)s->by;
         if (py >= s->p1y && py < s->p1y + PG_PADDLE) {
             s->vx = -s->vx * 1.05f;
             s->vy += ((py - s->p1y) - PG_PADDLE/2) * 0.15f;
             s->bx = 2;
-            pc_play(SND_BLIP);
+            audio_play_wav_async("/sfx.wav");
         }
     }
-    /* paddle collision — right */
+    
     if (s->bx >= PG_W-1 && s->vx > 0) {
         int py = (int)s->by;
         if (py >= s->p2y && py < s->p2y + PG_PADDLE) {
             s->vx = -s->vx * 1.05f;
             s->vy += ((py - s->p2y) - PG_PADDLE/2) * 0.15f;
             s->bx = PG_W - 1;
-            pc_play(SND_BLIP_LO);
+            audio_play_wav_async("/sfx.wav");
         }
     }
 
-    /* scoring */
     if (s->bx < 0) {
         s->s2++;
-        pc_play(SND_SCORE);
+        audio_play_wav_async("/sfx.wav");
         if (s->s2 >= 5) { s->winner = 2; pc_play(SND_GAMEOVER); }
         else pg_reset_ball(s, 1);
     }
     if (s->bx > PG_W+1) {
         s->s1++;
-        pc_play(SND_SCORE);
+        audio_play_wav_async("/sfx.wav");
         if (s->s1 >= 5) { s->winner = 1; pc_play(SND_GAMEOVER); }
         else pg_reset_ball(s, -1);
     }
 
-    /* AI for player 2 */
     int target = (int)s->by - PG_PADDLE/2;
     if (s->p2y < target) s->p2y++;
     else if (s->p2y > target) s->p2y--;
