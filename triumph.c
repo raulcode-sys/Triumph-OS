@@ -631,6 +631,8 @@ static int b_reboot(Cmd *c){(void)c;
 #include "tetris.c"
 #include "pongy.c"
 #include "chicken.c"
+#include "login.c"
+#include "setup_persist.c"
 #include "calc_ui.c"
 #include "files.c"
 #include "web.c"
@@ -673,7 +675,7 @@ typedef struct{const char *n;BFn fn;}BE;
 static BE btab[]={
     {"[",b_test},{"alias",b_alias},{"cat",b_cat},{"cd",b_cd},{"chmod",b_chmod},
     {"clear",b_clear},{"cp",b_cp},{"date",b_date},{"df",b_df},{"du",b_du},
-    {"echo",b_echo},{"edit",b_edit},{"nano",b_edit},{"vi",b_edit},{"snake",b_snake},{"tetris",b_tetris},{"pongy",b_pongy},{"chicken",b_chicken},{"menu",b_menu},{"files",b_files},{"web",b_web},{"clr",b_clr},{"calc",b_calc},{"figlet",b_figlet},{"ascii",b_figlet},{"poweroff",b_poweroff},{"shutdown",b_poweroff},{"reboot",b_reboot},
+    {"echo",b_echo},{"edit",b_edit},{"nano",b_edit},{"vi",b_edit},{"snake",b_snake},{"tetris",b_tetris},{"pongy",b_pongy},{"chicken",b_chicken},{"menu",b_menu},{"logout",b_logout},{"setup-persist",b_setup_persist},{"files",b_files},{"web",b_web},{"clr",b_clr},{"calc",b_calc},{"figlet",b_figlet},{"ascii",b_figlet},{"poweroff",b_poweroff},{"shutdown",b_poweroff},{"reboot",b_reboot},
     {"env",b_env},{"false",b_false},{"fetch",b_fetch},{"file",b_file},
     {"find",b_find},{"free",b_free},{"grep",b_grep},{"head",b_head},{"help",b_help},
     {"history",b_history},{"hostname",b_hostname},{"id",b_id},{"kill",b_kill},
@@ -876,6 +878,7 @@ int main(int argc,char *argv[]){
         return b_source(&dummy);}
     signals_init();
     setup_defaults();
+    login_init();
 
     if(getpid()==1){
         system("mount -t proc  proc  /proc 2>/dev/null");

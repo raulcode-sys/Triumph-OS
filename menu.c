@@ -21,6 +21,7 @@ static const struct { const char *label; const char *desc; const char *cmd; int 
     {"Files",      "File explorer",                 "files",   0},
     {"Web",        "HTTP browser (ethernet)",       "web",     0},
     {"Reboot",     "Restart the machine",           "reboot",  0},
+    {"Logout",     "Log out / switch user",         "logout",  0},
     {"Poweroff",   "Shut down",                     "poweroff",0},
 };
 #define MNU_N ((int)(sizeof(MNU)/sizeof(MNU[0])))
