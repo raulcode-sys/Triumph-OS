@@ -17,6 +17,7 @@ jobs:
         run: |
           mkdir -p iso/boot/grub
           sudo cp /boot/vmlinuz-$(uname -r) iso/boot/vmlinuz
+          sudo chmod 644 iso/boot/vmlinuz
 
       - name: Copy kernel modules and firmware
         run: |
