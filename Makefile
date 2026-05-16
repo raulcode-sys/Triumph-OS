@@ -33,12 +33,25 @@ iso: triumph init
 	mkdir -p iso/boot/grub
 	cp initramfs.img iso/boot/initramfs.img
 	# grub.cfg
-	echo 'set timeout=3'                              > iso/boot/grub/grub.cfg
-	echo 'set default=0'                             >> iso/boot/grub/grub.cfg
-	echo 'menuentry "Triumph OS" {'                  >> iso/boot/grub/grub.cfg
-	echo '  linux  /boot/vmlinuz quiet loglevel=0'  >> iso/boot/grub/grub.cfg
-	echo '  initrd /boot/initramfs.img'             >> iso/boot/grub/grub.cfg
-	echo '}'                                         >> iso/boot/grub/grub.cfg
+	echo 'set timeout=3'                                                                         > iso/boot/grub/grub.cfg
+	echo 'set default=0'                                                                        >> iso/boot/grub/grub.cfg
+	echo 'insmod all_video'                                                                     >> iso/boot/grub/grub.cfg
+	echo 'insmod video_fb'                                                                      >> iso/boot/grub/grub.cfg
+	echo 'insmod gfxterm'                                                                       >> iso/boot/grub/grub.cfg
+	echo 'set gfxmode=1920x1080x32,1280x720x32,auto'                                           >> iso/boot/grub/grub.cfg
+	echo 'terminal_output gfxterm'                                                              >> iso/boot/grub/grub.cfg
+	echo 'menuentry "Triumph OS" {'                                                             >> iso/boot/grub/grub.cfg
+	echo '  linux  /boot/vmlinuz quiet loglevel=0 fbcon=map:0 video=efifb:on,1920x1080-32'    >> iso/boot/grub/grub.cfg
+	echo '  initrd /boot/initramfs.img'                                                        >> iso/boot/grub/grub.cfg
+	echo '}'                                                                                    >> iso/boot/grub/grub.cfg
+	echo 'menuentry "Triumph OS (fallback 720p)" {'                                            >> iso/boot/grub/grub.cfg
+	echo '  linux  /boot/vmlinuz quiet loglevel=0 fbcon=map:0 video=efifb:on,1280x720-32'     >> iso/boot/grub/grub.cfg
+	echo '  initrd /boot/initramfs.img'                                                        >> iso/boot/grub/grub.cfg
+	echo '}'                                                                                    >> iso/boot/grub/grub.cfg
+	echo 'menuentry "Triumph OS (VESA legacy)" {'                                              >> iso/boot/grub/grub.cfg
+	echo '  linux  /boot/vmlinuz quiet loglevel=0 video=vesafb:1920x1080-32'                  >> iso/boot/grub/grub.cfg
+	echo '  initrd /boot/initramfs.img'                                                        >> iso/boot/grub/grub.cfg
+	echo '}'                                                                                    >> iso/boot/grub/grub.cfg
 	grub-mkrescue --output=triumph-os.iso iso/ --compress=xz
 	@echo ""
 	@echo ">>> triumph-os.iso built successfully <<<"
