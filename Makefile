@@ -22,18 +22,12 @@ iso: triumph init
 	-cp -r /lib/modules initramfs/lib/ 2>/dev/null
 	-cp -r /lib/firmware initramfs/lib/ 2>/dev/null
 	fakeroot bash -c 'cd initramfs && find . | cpio -o -H newc | gzip -9 > ../initramfs.img'
-	mkdir -p iso/boot/grub/fonts
+	mkdir -p iso/boot/grub
 	cp initramfs.img iso/boot/initramfs.img
-	cp /usr/share/grub/unicode.pf2 iso/boot/grub/fonts/unicode.pf2 2>/dev/null || true
-	printf 'set timeout=3\n'                                                                > iso/boot/grub/grub.cfg
+	printf 'set timeout=5\n'                                                                > iso/boot/grub/grub.cfg
 	printf 'set default=0\n'                                                               >> iso/boot/grub/grub.cfg
-	printf 'insmod all_video\n'                                                            >> iso/boot/grub/grub.cfg
-	printf 'insmod video_fb\n'                                                             >> iso/boot/grub/grub.cfg
-	printf 'insmod gfxterm\n'                                                              >> iso/boot/grub/grub.cfg
-	printf 'insmod font\n'                                                                 >> iso/boot/grub/grub.cfg
-	printf 'loadfont /boot/grub/fonts/unicode.pf2\n'                                      >> iso/boot/grub/grub.cfg
-	printf 'set gfxmode=1920x1080x32,1280x720x32,auto\n'                                  >> iso/boot/grub/grub.cfg
-	printf 'terminal_output gfxterm\n'                                                     >> iso/boot/grub/grub.cfg
+	printf 'terminal_input console\n'                                                      >> iso/boot/grub/grub.cfg
+	printf 'terminal_output console\n'                                                     >> iso/boot/grub/grub.cfg
 	printf 'menuentry "Triumph OS" {\n'                                                    >> iso/boot/grub/grub.cfg
 	printf '  linux  /boot/vmlinuz quiet loglevel=0 fbcon=map:0 video=efifb:on\n'        >> iso/boot/grub/grub.cfg
 	printf '  initrd /boot/initramfs.img\n'                                                >> iso/boot/grub/grub.cfg
