@@ -213,9 +213,9 @@ static int triumph_readline(char *buf,int maxlen){
                     write(1,"\x1b[P",3);write(1,buf+pos,len-pos);
                     if(len-pos){char mv[16];snprintf(mv,16,"\x1b[%dD",len-pos);write(1,mv,strlen(mv));}}}
         } else if(c>=32&&c<127){
-            /* Shift+M (M=77) and Shift+T (T=84) toggle FB overlays */
-            if (c == 'M' && len == 0) { fb_toggle_menu(); continue; }
-            if (c == 'T' && len == 0) { fb_toggle_term(); continue; }
+            /* Shift+M / Shift+T toggle overlays — works anytime */
+            if (c == 'M') { fb_toggle_menu(); continue; }
+            if (c == 'T') { fb_toggle_term(); continue; }
             if(len<maxlen-1){
                 memmove(buf+pos+1,buf+pos,len-pos);buf[pos]=c;len++;buf[len]='\0';
                 write(1,buf+pos,len-pos);pos++;
@@ -893,9 +893,10 @@ int main(int argc,char *argv[]){
         system("mount -t sysfs sys   /sys  2>/dev/null");
         system("mount -t devtmpfs dev /dev  2>/dev/null");
         system("mount -t tmpfs  tmp  /tmp  2>/dev/null");}
-    show_banner();
-    fb_startup();   /* init framebuffer wallpaper */
-    
+    fb_startup();   /* init framebuffer wallpaper — boots to pure wallpaper */
+    /* hide TTY cursor and clear screen so wallpaper is all that shows */
+    write(1, "\x1b[?25l\x1b[2J\x1b[H", 15);
+    /* show menu first so user has something to interact with */
     { Cmd dc={0}; b_menu(&dc); }
     char line[SH_MAX_INPUT];
     while(running){
