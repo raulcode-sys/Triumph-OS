@@ -1,4 +1,5 @@
 #include <sys/statfs.h>
+#include <sys/mman.h>
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -20,6 +21,10 @@
 #include <pwd.h>
 #include <grp.h>
 #include <glob.h>
+
+/* Framebuffer wallpaper compositor */
+#include "wallpaper.h"
+#include "fb.c"
 #include <ctype.h>
 #include <stdarg.h>
 
@@ -208,6 +213,9 @@ static int triumph_readline(char *buf,int maxlen){
                     write(1,"\x1b[P",3);write(1,buf+pos,len-pos);
                     if(len-pos){char mv[16];snprintf(mv,16,"\x1b[%dD",len-pos);write(1,mv,strlen(mv));}}}
         } else if(c>=32&&c<127){
+            /* Shift+M (M=77) and Shift+T (T=84) toggle FB overlays */
+            if (c == 'M' && len == 0) { fb_toggle_menu(); continue; }
+            if (c == 'T' && len == 0) { fb_toggle_term(); continue; }
             if(len<maxlen-1){
                 memmove(buf+pos+1,buf+pos,len-pos);buf[pos]=c;len++;buf[len]='\0';
                 write(1,buf+pos,len-pos);pos++;
@@ -886,6 +894,7 @@ int main(int argc,char *argv[]){
         system("mount -t devtmpfs dev /dev  2>/dev/null");
         system("mount -t tmpfs  tmp  /tmp  2>/dev/null");}
     show_banner();
+    fb_startup();   /* init framebuffer wallpaper */
     
     { Cmd dc={0}; b_menu(&dc); }
     char line[SH_MAX_INPUT];
@@ -897,6 +906,7 @@ int main(int argc,char *argv[]){
         hist_add(line);
         run_line(line);}
     if(getpid()==1){
+        fb_shutdown();
         system("reboot -f 2>/dev/null");
         for(;;)pause();}
     return last_exit;}
