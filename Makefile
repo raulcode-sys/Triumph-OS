@@ -20,7 +20,7 @@ clean:
 #   iso/boot/grub/grub.cfg
 #   iso/boot/vmlinuz   ← copy your kernel here
 iso: triumph init
-	mkdir -p initramfs/{bin,dev,proc,sys,tmp,run,root,lib,persist}
+	mkdir -p initramfs/bin initramfs/dev initramfs/proc initramfs/sys initramfs/tmp initramfs/run initramfs/root initramfs/lib initramfs/persist
 	cp triumph  initramfs/bin/triumph
 	cp init     initramfs/init
 	chmod +x    initramfs/init initramfs/bin/triumph
