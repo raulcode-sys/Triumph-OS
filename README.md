@@ -27,6 +27,7 @@ Note: It is a stand-alone Linux distro as it is based off of the Linux kernel.
 - **Bundled Realtek r8169 driver + firmware** for ethernet on most laptops.
 - **Boot melody**
 - **Beeps for game functions**
+- **Wallpaper revealed by pressing 'Shift+T' on the shell**
 
 ## What's NOT here, on purpose
 
