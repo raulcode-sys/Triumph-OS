@@ -170,6 +170,28 @@ int main(void){
         kmsg("audio modules loaded");
     }
 
+    /* ── USB + iPhone tethering modules ── */
+    {
+        const char *usb_modules[] = {
+            "/lib/modules/6.8.0-111-generic/kernel/drivers/usb/common/usb-common.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/drivers/usb/core/usbcore.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/drivers/usb/host/ehci-hcd.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/drivers/usb/host/ehci-pci.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/drivers/usb/host/xhci-hcd.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/drivers/usb/host/xhci-pci.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/drivers/net/usb/ipheth.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/drivers/net/usb/cdc_ether.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/drivers/net/usb/rndis_host.ko",
+            "/lib/modules/6.8.0-111-generic/kernel/drivers/net/usb/usbnet.ko",
+            NULL
+        };
+        for (int i = 0; usb_modules[i]; i++) {
+            char err[200] = "";
+            load_module(usb_modules[i], err, sizeof(err));
+        }
+        kmsg("USB/tethering modules loaded");
+    }
+
     sleep(2);
 
     audio_play_wav_async("/boot.wav");

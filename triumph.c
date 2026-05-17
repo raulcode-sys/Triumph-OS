@@ -626,6 +626,74 @@ static int b_help(Cmd *c){(void)c;
 #include <sys/reboot.h>
 #include "beep.c"
 #include "audio.c"
+static int b_tether(Cmd *c){(void)c;
+    printf(BLD CYN"Triumph OS — USB Tethering\n"RST);
+    printf(GRY"Looking for tethered devices...\n"RST);
+
+    /* try to find a USB network interface */
+    const char *ifaces[] = {"eth1","eth2","usb0","enp0s*","ipheth0",NULL};
+    char found[32] = "";
+
+    /* scan /sys/class/net for any USB-backed interface */
+    DIR *d = opendir("/sys/class/net");
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d))) {
+            if (e->d_name[0]=='.') continue;
+            if (strcmp(e->d_name,"lo")==0) continue;
+            if (strcmp(e->d_name,"eth0")==0) continue; /* skip main ethernet */
+            char path[256];
+            snprintf(path,sizeof(path),"/sys/class/net/%s/device/uevent",e->d_name);
+            int fd=open(path,O_RDONLY);
+            if (fd>=0) {
+                char buf[512]={0}; read(fd,buf,sizeof(buf)-1); close(fd);
+                if (strstr(buf,"usb")||strstr(buf,"USB")||strstr(buf,"ipheth")) {
+                    strncpy(found,e->d_name,sizeof(found)-1);
+                    break;
+                }
+            }
+            /* also just try any non-eth0 interface */
+            if (!found[0]) strncpy(found,e->d_name,sizeof(found)-1);
+        }
+        closedir(d);
+    }
+
+    if (!found[0]) {
+        printf(RED"No USB network device found.\n"RST);
+        printf(GRY"Make sure your phone is plugged in with a data cable\n");
+        printf("and USB tethering / Personal Hotspot is enabled.\n"RST);
+        return 1;
+    }
+
+    printf(GRN"Found: %s\n"RST, found);
+    printf(CYN"Bringing up interface...\n"RST);
+
+    char cmd[128];
+    snprintf(cmd,sizeof(cmd),"ip link set %s up 2>/dev/null || ifconfig %s up 2>/dev/null",found,found);
+    system(cmd);
+
+    printf(CYN"Running DHCP...\n"RST);
+    /* try built-in dhcp via the web module, or udhcpc if available */
+    snprintf(cmd,sizeof(cmd),"udhcpc -i %s -n -q 2>/dev/null",found);
+    int rc = system(cmd);
+
+    if (rc != 0) {
+        /* manual fallback — try a common subnet */
+        snprintf(cmd,sizeof(cmd),"ip addr add 172.20.10.2/28 dev %s 2>/dev/null || ifconfig %s 172.20.10.2 netmask 255.255.255.240 2>/dev/null",found,found);
+        system(cmd);
+        snprintf(cmd,sizeof(cmd),"ip route add default via 172.20.10.1 dev %s 2>/dev/null || route add default gw 172.20.10.1 %s 2>/dev/null",found,found);
+        system(cmd);
+        /* set DNS */
+        int fd=open("/etc/resolv.conf",O_WRONLY|O_CREAT|O_TRUNC,0644);
+        if(fd>=0){write(fd,"nameserver 8.8.8.8\n",19);close(fd);}
+        printf(YLW"DHCP failed — set manual IP 172.20.10.2 (iPhone default)\n"RST);
+    }
+
+    printf(GRN BLD"Tethering active on %s!\n"RST, found);
+    printf(GRY"Try: web google.com\n"RST);
+    return 0;
+}
+
 static int b_poweroff(Cmd *c){(void)c;
     pc_play(SND_SHUTDOWN);
     sync();
@@ -690,7 +758,7 @@ typedef struct{const char *n;BFn fn;}BE;
 static BE btab[]={
     {"[",b_test},{"alias",b_alias},{"cat",b_cat},{"cd",b_cd},{"chmod",b_chmod},
     {"clear",b_clear},{"cp",b_cp},{"date",b_date},{"df",b_df},{"du",b_du},
-    {"echo",b_echo},{"edit",b_edit},{"nano",b_edit},{"vi",b_edit},{"snake",b_snake},{"tetris",b_tetris},{"pongy",b_pongy},{"chicken",b_chicken},{"menu",b_menu},{"setup-persist",b_setup_persist},{"files",b_files},{"web",b_web},{"clr",b_clr},{"calc",b_calc},{"figlet",b_figlet},{"ascii",b_figlet},{"poweroff",b_poweroff},{"shutdown",b_poweroff},{"reboot",b_reboot},
+    {"echo",b_echo},{"edit",b_edit},{"nano",b_edit},{"vi",b_edit},{"snake",b_snake},{"tetris",b_tetris},{"pongy",b_pongy},{"chicken",b_chicken},{"menu",b_menu},{"setup-persist",b_setup_persist},{"files",b_files},{"web",b_web},{"clr",b_clr},{"calc",b_calc},{"figlet",b_figlet},{"ascii",b_figlet},{"tether",b_tether},{"poweroff",b_poweroff},{"shutdown",b_poweroff},{"reboot",b_reboot},
     {"env",b_env},{"false",b_false},{"fetch",b_fetch},{"file",b_file},
     {"find",b_find},{"free",b_free},{"grep",b_grep},{"head",b_head},{"help",b_help},
     {"history",b_history},{"hostname",b_hostname},{"id",b_id},{"kill",b_kill},
