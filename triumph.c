@@ -176,6 +176,14 @@ static int triumph_readline(char *buf,int maxlen){
     while(1){
         unsigned char c;
         if(read(STDIN_FILENO,&c,1)<=0){term_restore();return -1;}
+        /* sentinel from external keyboard thread or internal Shift+M/T */
+        if(c==0x01){
+            unsigned char c2;
+            if(read(STDIN_FILENO,&c2,1)>0){
+                buf[0]=0x01; buf[1]=c2; buf[2]=0;
+                term_restore(); return 2;
+            }
+        }
         if(c=='\r'||c=='\n'){term_restore();buf[len]='\0';write(1,"\r\n",2);return len;}
         if(c==3){term_restore();write(1,"^C\r\n",4);buf[0]='\0';return 0;}
         if(c==4&&len==0){term_restore();return -1;}
@@ -212,9 +220,9 @@ static int triumph_readline(char *buf,int maxlen){
                     write(1,"\x1b[P",3);write(1,buf+pos,len-pos);
                     if(len-pos){char mv[16];snprintf(mv,16,"\x1b[%dD",len-pos);write(1,mv,strlen(mv));}}}
         } else if(c>=32&&c<127){
-            /* Shift+M / Shift+T — return special codes to main loop */
-            if (c == 'M') { buf[0]='\x01'; buf[1]='M'; buf[2]=0; return 2; }
-            if (c == 'T') { buf[0]='\x01'; buf[1]='T'; buf[2]=0; return 2; }
+            /* Shift+M / Shift+T when buffer is empty = toggle overlays */
+            if (c == 'M' && len == 0) { buf[0]='\x01'; buf[1]='M'; buf[2]=0; term_restore(); return 2; }
+            if (c == 'T' && len == 0) { buf[0]='\x01'; buf[1]='T'; buf[2]=0; term_restore(); return 2; }
             if(len<maxlen-1){
                 memmove(buf+pos+1,buf+pos,len-pos);buf[pos]=c;len++;buf[len]='\0';
                 write(1,buf+pos,len-pos);pos++;

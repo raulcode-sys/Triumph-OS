@@ -1,31 +1,37 @@
 /*
  * fb.c - Triumph OS framebuffer compositor
  *
- * Strategy:
- *   - Boot: paint wallpaper to /dev/fb0, set KD_GRAPHICS to hide TTY text
- *   - Shift+M: draw semi-transparent panel on fb, switch to KD_TEXT, run real menu
- *              when menu exits, repaint wallpaper, back to KD_GRAPHICS
- *   - Shift+T: draw semi-transparent panel on fb, switch to KD_TEXT, run real shell
- *              when shell exits, repaint wallpaper, back to KD_GRAPHICS
- *   - External keyboards via /dev/input/event*
+ * Approach:
+ *   - Always keep TTY in KD_TEXT mode (fbcon renders TTY text over framebuffer)
+ *   - On boot: paint wallpaper to /dev/fb0, clear TTY, hide cursor
+ *   - Shift+M: repaint wallpaper + panel, clear TTY, run real b_menu()
+ *              after menu exits: repaint wallpaper, clear TTY
+ *   - Shift+T: repaint wallpaper + panel, run real shell loop
+ *              Shift+T again: repaint wallpaper, clear TTY
+ *
+ * The "transparency" effect: fbcon renders TTY text ON TOP of the framebuffer.
+ * The framebuffer panel is blended with the wallpaper. TTY black backgrounds
+ * are transparent to the framebuffer through fbcon. So you see:
+ *   wallpaper → blended panel → TTY text on top = riced look
+ *
+ * External keyboards: /dev/input/event* thread
  */
 
 #pragma once
 
 #include <linux/fb.h>
 #include <linux/input.h>
-#include <linux/kd.h>
 #include <sys/mman.h>
 #include <pthread.h>
 #include "wallpaper.h"
 
 /* ── panel style ─────────────────────────────────────────── */
-#define PANEL_ALPHA  155   /* 0=invisible 255=opaque — ~60% = glassy */
-#define COL_PANEL_BG 0x04080F
-#define COL_TITLEBAR 0x070F1C
+#define PANEL_ALPHA  160
+#define COL_PANEL_BG 0x050C18
+#define COL_TITLEBAR 0x08122A
 #define COL_BORDER   0x33CCFF
 
-/* ── framebuffer state ───────────────────────────────────── */
+/* ── framebuffer ─────────────────────────────────────────── */
 typedef struct {
     int fd, w, h, stride, bpp;
     int r_off, g_off, b_off;
@@ -34,8 +40,6 @@ typedef struct {
     unsigned int *wp;
 } FB;
 static FB fb = {.fd=-1};
-
-static int tty_fd = -1;  /* /dev/tty0 for KD mode switching */
 
 /* ── pixel ops ───────────────────────────────────────────── */
 static inline unsigned int fb_blend(unsigned int bg, unsigned int fg, int a){
@@ -68,16 +72,14 @@ static void fb_draw_wallpaper(void){
                 fb_put(x,y,fb.wp[y*fb.w+x]);
 }
 
-/* ── draw transparent panel over wallpaper ───────────────── */
+/* ── draw transparent panel ──────────────────────────────── */
 static void fb_draw_panel(int px, int py, int pw, int ph){
     if(fb.fd<0) return;
-    /* fill body blended over wallpaper */
     for(int y=py;y<py+ph;y++)
         for(int x=px;x<px+pw;x++){
             unsigned int col=(y<py+4)?COL_TITLEBAR:COL_PANEL_BG;
             fb_put(x,y,fb_blend(wp_get(x,y),col,PANEL_ALPHA));
         }
-    /* 2px border */
     for(int x=px;x<px+pw;x++){
         fb_put(x,py,COL_BORDER);   fb_put(x,py+1,COL_BORDER);
         fb_put(x,py+ph-1,COL_BORDER); fb_put(x,py+ph-2,COL_BORDER);
@@ -86,7 +88,6 @@ static void fb_draw_panel(int px, int py, int pw, int ph){
         fb_put(px,y,COL_BORDER);   fb_put(px+1,y,COL_BORDER);
         fb_put(px+pw-1,y,COL_BORDER); fb_put(px+pw-2,y,COL_BORDER);
     }
-    /* rounded corners r=8 */
     for(int dy=0;dy<8;dy++)
         for(int dx=0;dx<8-dy;dx++){
             fb_put(px+dx,     py+dy,     wp_get(px+dx,py+dy));
@@ -96,27 +97,23 @@ static void fb_draw_panel(int px, int py, int pw, int ph){
         }
 }
 
-/* ── TTY mode switching ──────────────────────────────────── */
-static void tty_graphics(void){
-    if(tty_fd>=0) ioctl(tty_fd,KDSETMODE,KD_GRAPHICS);
-}
-static void tty_text(void){
-    if(tty_fd>=0) ioctl(tty_fd,KDSETMODE,KD_TEXT);
+/* ── clear TTY and hide cursor ───────────────────────────── */
+static void tty_clear(void){
+    write(1,"\x1b[2J\x1b[H\x1b[?25l",14);
+    fflush(stdout);
 }
 
-/* ── panel geometry ──────────────────────────────────────── */
+/* ── geometry ────────────────────────────────────────────── */
 static void menu_rect(int *px,int *py,int *pw,int *ph){
-    /* centred, 55% wide, 75% tall */
     *pw=fb.w*55/100; *ph=fb.h*75/100;
     *px=(fb.w-*pw)/2; *py=(fb.h-*ph)/2;
 }
 static void term_rect(int *px,int *py,int *pw,int *ph){
-    /* near-fullscreen with small margin */
     int m=fb.w*2/100;
     *px=m;*py=m;*pw=fb.w-m*2;*ph=fb.h-m*2;
 }
 
-/* ── overlay flags ───────────────────────────────────────── */
+/* ── overlay state ───────────────────────────────────────── */
 static int menu_open=0;
 static int term_open=0;
 
@@ -124,24 +121,25 @@ static int term_open=0;
 static void fb_toggle_menu(void){
     if(fb.fd<0) return;
     if(menu_open){
+        /* closing — repaint wallpaper, clear TTY */
         fb_draw_wallpaper();
-        tty_graphics();
+        tty_clear();
         menu_open=0;
         return;
     }
+    /* opening — paint wallpaper + panel, clear TTY so menu renders clean */
     menu_open=1;
+    fb_draw_wallpaper();
     int px,py,pw,ph; menu_rect(&px,&py,&pw,&ph);
     fb_draw_panel(px,py,pw,ph);
-    tty_text();
-    printf("\x1b[2J\x1b[H");
-    fflush(stdout);
-    /* b_menu called from triumph.c after Cmd is defined */
+    tty_clear();
+    /* menu runs from triumph.c main loop */
 }
 
 static void fb_menu_post(void){
-    /* called by triumph.c after b_menu() returns */
+    /* after b_menu() returns */
     fb_draw_wallpaper();
-    tty_graphics();
+    tty_clear();
     menu_open=0;
 }
 
@@ -150,23 +148,21 @@ static void fb_toggle_term(void){
     if(fb.fd<0) return;
     if(term_open){
         fb_draw_wallpaper();
-        tty_graphics();
+        tty_clear();
         term_open=0;
         return;
     }
     term_open=1;
+    fb_draw_wallpaper();
     int px,py,pw,ph; term_rect(&px,&py,&pw,&ph);
     fb_draw_panel(px,py,pw,ph);
-    tty_text();
-    printf("\x1b[2J\x1b[H");
-    fflush(stdout);
-    /* shell loop runs in triumph.c */
+    tty_clear();
+    /* shell loop runs from triumph.c main loop */
 }
 
 static void fb_term_post(void){
-    /* called by triumph.c when terminal session ends */
     fb_draw_wallpaper();
-    tty_graphics();
+    tty_clear();
     term_open=0;
 }
 
@@ -200,9 +196,12 @@ static void *kbd_thread(void *arg){
                 if(ev.type!=EV_KEY) continue;
                 if(ev.code==KEY_LEFTSHIFT||ev.code==KEY_RIGHTSHIFT)
                     kbd_shift=(ev.value!=0);
+                /* external keyboard Shift+M/T are handled here
+                   but since we cant call into the main readline loop,
+                   we just write the sentinel to stdin so readline picks it up */
                 if(ev.value==1&&kbd_shift){
-                    if(ev.code==KEY_M) fb_toggle_menu();
-                    if(ev.code==KEY_T) fb_toggle_term();
+                    if(ev.code==KEY_M){ write(0,"\x01M",2); }
+                    if(ev.code==KEY_T){ write(0,"\x01T",2); }
                 }
             }
         }
@@ -250,25 +249,14 @@ static int fb_init(void){
 /* ── startup / shutdown ──────────────────────────────────── */
 static void fb_startup(void){
     if(fb_init()<0) return;
-
-    tty_fd=open("/dev/tty0",O_RDWR);
-    if(tty_fd<0) tty_fd=open("/dev/console",O_RDWR);
-
-    /* paint wallpaper */
     fb_draw_wallpaper();
-
-    /* suppress TTY text layer */
-    tty_graphics();
-
-    /* start external keyboard thread */
+    tty_clear();
     pthread_t t; pthread_create(&t,NULL,kbd_thread,NULL); pthread_detach(t);
 }
 
 static void fb_shutdown(void){
     if(fb.fd<0) return;
-    /* restore TTY text mode */
-    tty_text();
-    if(tty_fd>=0){close(tty_fd);tty_fd=-1;}
+    write(1,"\x1b[?25h",6);
     free(fb.wp);fb.wp=NULL;
     munmap(fb.mem,fb.memsize);
     close(fb.fd);fb.fd=-1;
