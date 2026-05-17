@@ -261,7 +261,7 @@ static const struct { const char *label; const char *cmd; } MENU_ITEMS[] = {
 static int menu_sel = 0;
 
 /* forward decl */
-static void run_line(const char *);
+static int run_line(char *);
 
 static void fb_draw_menu_content(int px, int py, int pw, int ph) {
     /* title */

@@ -102,7 +102,7 @@ static int b_setup_persist(Cmd *c) { (void)c;
     mkdir("/persist", 0755);
     if (mount(newpart, "/persist", "ext4", 0, "") == 0) {
         mkdir("/persist/home", 0755);
-        g_persist_ok = 1;
+        /* persist mounted */
         printf(GRN BLD "\nDone! Persistent storage is now active.\n" RST);
         printf(GRY "Your accounts and files will survive reboots.\n" RST);
         printf(YLW "Restart Triumph to use the new login system: " RST);
