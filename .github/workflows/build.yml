@@ -21,9 +21,23 @@ jobs:
 
       - name: Copy kernel modules and firmware
         run: |
-          mkdir -p initramfs/lib
-          cp -r /lib/modules/$(uname -r) initramfs/lib/modules/ 2>/dev/null || true
-          cp -r /lib/firmware initramfs/lib/firmware/ 2>/dev/null || true
+          KVER=$(uname -r)
+          mkdir -p initramfs/lib/modules/$KVER/kernel/drivers
+          # ethernet
+          sudo cp -r /lib/modules/$KVER/kernel/drivers/net initramfs/lib/modules/$KVER/kernel/drivers/ 2>/dev/null || true
+          # USB host controllers + tethering
+          sudo cp -r /lib/modules/$KVER/kernel/drivers/usb initramfs/lib/modules/$KVER/kernel/drivers/ 2>/dev/null || true
+          # sound
+          sudo cp -r /lib/modules/$KVER/kernel/sound initramfs/lib/modules/$KVER/kernel/ 2>/dev/null || true
+          # firmware
+          sudo cp -r /lib/firmware initramfs/lib/firmware/ 2>/dev/null || true
+          # module dependency files
+          sudo cp /lib/modules/$KVER/modules.* initramfs/lib/modules/$KVER/ 2>/dev/null || true
+
+      - name: Patch init.c module paths
+        run: |
+          KVER=$(uname -r)
+          sed -i "s/6.8.0-111-generic/$KVER/g" init.c
 
       - name: Build
         run: make iso
