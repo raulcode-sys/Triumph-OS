@@ -1,6 +1,6 @@
 CC      = gcc
 CFLAGS  = -O2 -static -w
-LDFLAGS = -lm -lmbedtls -lmbedx509 -lmbedcrypto -lpthread
+LDFLAGS = -lm -lmbedtls -lmbedx509 -lmbedcrypto -lpthread -lutil
 
 all: triumph init
 
