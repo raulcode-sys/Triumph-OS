@@ -60,6 +60,7 @@ grub-mkrescue --output=triumph-os.iso iso/ --compress=xz
 ```sh
 qemu-system-x86_64 -cdrom triumph-os.iso -m 512M
 ```
+***Keep in mind it is a little buggy in qemu***
 
 ### USB on real hardware
 OpenBSD:
