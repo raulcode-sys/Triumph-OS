@@ -22,11 +22,8 @@
 #include <grp.h>
 #include <glob.h>
 
-/* Framebuffer wallpaper compositor */
-#define SH_MAX_INPUT 4096
-#define MAX_ARGS    256
+/* wallpaper pixel data - included early, no dependencies */
 #include "wallpaper.h"
-#include "fb.c"
 #include <ctype.h>
 #include <stdarg.h>
 
@@ -213,28 +210,9 @@ static int triumph_readline(char *buf,int maxlen){
                     write(1,"\x1b[P",3);write(1,buf+pos,len-pos);
                     if(len-pos){char mv[16];snprintf(mv,16,"\x1b[%dD",len-pos);write(1,mv,strlen(mv));}}}
         } else if(c>=32&&c<127){
-            /* Shift+M / Shift+T toggle overlays */
-            if (c == 'M') {
-                fb_toggle_menu();
-                if(menu_open){ Cmd dc={0}; b_menu(&dc); fb_menu_post(); }
-                continue;
-            }
-            if (c == 'T') {
-                fb_toggle_term();
-                if(term_open){
-                    char tline[SH_MAX_INPUT];
-                    while(running){
-                        print_prompt();
-                        int tn=triumph_readline(tline,SH_MAX_INPUT);
-                        if(tn<0) break;
-                        if(tn==0) continue;
-                        hist_add(tline);
-                        run_line(tline);
-                    }
-                    fb_term_post();
-                }
-                continue;
-            }
+            /* Shift+M / Shift+T — return special codes to main loop */
+            if (c == 'M') { buf[0]='\x01'; buf[1]='M'; buf[2]=0; return 2; }
+            if (c == 'T') { buf[0]='\x01'; buf[1]='T'; buf[2]=0; return 2; }
             if(len<maxlen-1){
                 memmove(buf+pos+1,buf+pos,len-pos);buf[pos]=c;len++;buf[len]='\0';
                 write(1,buf+pos,len-pos);pos++;
@@ -662,6 +640,7 @@ static int b_reboot(Cmd *c){(void)c;
 #include "calc_ui.c"
 #include "files.c"
 #include "web.c"
+#include "fb.c"
 #include "menu.c"
 #include "tools.c"
 
@@ -916,12 +895,36 @@ int main(int argc,char *argv[]){
     /* boot straight to wallpaper — no login, no menu, no banner */
     fb_startup();
 
-    /* shell loop — Shift+M/T handled in readline */
+    /* main loop */
     char line[SH_MAX_INPUT];
     while(running){
         int n=triumph_readline(line,SH_MAX_INPUT);
         if(n<0) break;
         if(n==0) continue;
+        /* Shift+M: open transparent menu panel */
+        if(n==2 && line[0]=='\x01' && line[1]=='M'){
+            fb_toggle_menu();
+            if(menu_open){ Cmd dc={0}; b_menu(&dc); fb_menu_post(); }
+            continue;
+        }
+        /* Shift+T: open transparent terminal panel */
+        if(n==2 && line[0]=='\x01' && line[1]=='T'){
+            fb_toggle_term();
+            if(term_open){
+                char tline[SH_MAX_INPUT];
+                while(running){
+                    print_prompt();
+                    int tn=triumph_readline(tline,SH_MAX_INPUT);
+                    if(tn<0) break;
+                    if(tn==0) continue;
+                    if(tline[0]=='\x01'&&tline[1]=='T') break;
+                    hist_add(tline);
+                    run_line(tline);
+                }
+                fb_term_post();
+            }
+            continue;
+        }
         hist_add(line);
         run_line(line);}
     if(getpid()==1){
