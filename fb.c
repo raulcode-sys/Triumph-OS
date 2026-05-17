@@ -246,12 +246,37 @@ static int fb_init(void){
     return 0;
 }
 
+/* ── wallpaper keeper thread ─────────────────────────────── */
+/* fbcon blanks the fb when TTY is idle — repaint every 100ms to fight it */
+static void *wp_keeper(void *arg){
+    (void)arg;
+    while(1){
+        usleep(100000);
+        /* only repaint when no panel is open — panels repaint themselves */
+        if(!menu_open && !term_open)
+            fb_draw_wallpaper();
+    }
+    return NULL;
+}
+
 /* ── startup / shutdown ──────────────────────────────────── */
 static void fb_startup(void){
     if(fb_init()<0) return;
+
+    /* disable fbcon so it doesn't paint over our framebuffer */
+    {
+        int fd=open("/sys/class/vtconsole/vtcon1/bind",O_WRONLY);
+        if(fd<0) fd=open("/sys/class/vtconsole/vtcon0/bind",O_WRONLY);
+        if(fd>=0){write(fd,"0",1);close(fd);}
+    }
+
     fb_draw_wallpaper();
     tty_clear();
-    pthread_t t; pthread_create(&t,NULL,kbd_thread,NULL); pthread_detach(t);
+
+    /* keep wallpaper alive against fbcon repaints */
+    pthread_t t;
+    pthread_create(&t,NULL,kbd_thread,NULL); pthread_detach(t);
+    pthread_create(&t,NULL,wp_keeper,NULL);  pthread_detach(t);
 }
 
 static void fb_shutdown(void){
