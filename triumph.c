@@ -23,6 +23,8 @@
 #include <glob.h>
 
 /* Framebuffer wallpaper compositor */
+#define SH_MAX_INPUT 4096
+#define MAX_ARGS    256
 #include "wallpaper.h"
 #include "fb.c"
 #include <ctype.h>
@@ -30,9 +32,7 @@
 
 #define SH_VERSION  "1.0.0"
 
-#define SH_MAX_INPUT 4096
 #define MAX_TOKENS  512
-#define MAX_ARGS    256
 #define MAX_PIPES   16
 #define MAX_HISTORY 500
 #define MAX_ALIASES 64
@@ -213,9 +213,28 @@ static int triumph_readline(char *buf,int maxlen){
                     write(1,"\x1b[P",3);write(1,buf+pos,len-pos);
                     if(len-pos){char mv[16];snprintf(mv,16,"\x1b[%dD",len-pos);write(1,mv,strlen(mv));}}}
         } else if(c>=32&&c<127){
-            /* Shift+M / Shift+T toggle overlays — works anytime */
-            if (c == 'M') { fb_toggle_menu(); continue; }
-            if (c == 'T') { fb_toggle_term(); continue; }
+            /* Shift+M / Shift+T toggle overlays */
+            if (c == 'M') {
+                fb_toggle_menu();
+                if(menu_open){ Cmd dc={0}; b_menu(&dc); fb_menu_post(); }
+                continue;
+            }
+            if (c == 'T') {
+                fb_toggle_term();
+                if(term_open){
+                    char tline[SH_MAX_INPUT];
+                    while(running){
+                        print_prompt();
+                        int tn=triumph_readline(tline,SH_MAX_INPUT);
+                        if(tn<0) break;
+                        if(tn==0) continue;
+                        hist_add(tline);
+                        run_line(tline);
+                    }
+                    fb_term_post();
+                }
+                continue;
+            }
             if(len<maxlen-1){
                 memmove(buf+pos+1,buf+pos,len-pos);buf[pos]=c;len++;buf[len]='\0';
                 write(1,buf+pos,len-pos);pos++;
