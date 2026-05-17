@@ -639,7 +639,6 @@ static int b_reboot(Cmd *c){(void)c;
 #include "tetris.c"
 #include "pongy.c"
 #include "chicken.c"
-#include "login.c"
 #include "setup_persist.c"
 #include "calc_ui.c"
 #include "files.c"
@@ -683,7 +682,7 @@ typedef struct{const char *n;BFn fn;}BE;
 static BE btab[]={
     {"[",b_test},{"alias",b_alias},{"cat",b_cat},{"cd",b_cd},{"chmod",b_chmod},
     {"clear",b_clear},{"cp",b_cp},{"date",b_date},{"df",b_df},{"du",b_du},
-    {"echo",b_echo},{"edit",b_edit},{"nano",b_edit},{"vi",b_edit},{"snake",b_snake},{"tetris",b_tetris},{"pongy",b_pongy},{"chicken",b_chicken},{"menu",b_menu},{"logout",b_logout},{"setup-persist",b_setup_persist},{"files",b_files},{"web",b_web},{"clr",b_clr},{"calc",b_calc},{"figlet",b_figlet},{"ascii",b_figlet},{"poweroff",b_poweroff},{"shutdown",b_poweroff},{"reboot",b_reboot},
+    {"echo",b_echo},{"edit",b_edit},{"nano",b_edit},{"vi",b_edit},{"snake",b_snake},{"tetris",b_tetris},{"pongy",b_pongy},{"chicken",b_chicken},{"menu",b_menu},{"setup-persist",b_setup_persist},{"files",b_files},{"web",b_web},{"clr",b_clr},{"calc",b_calc},{"figlet",b_figlet},{"ascii",b_figlet},{"poweroff",b_poweroff},{"shutdown",b_poweroff},{"reboot",b_reboot},
     {"env",b_env},{"false",b_false},{"fetch",b_fetch},{"file",b_file},
     {"find",b_find},{"free",b_free},{"grep",b_grep},{"head",b_head},{"help",b_help},
     {"history",b_history},{"hostname",b_hostname},{"id",b_id},{"kill",b_kill},
@@ -886,24 +885,24 @@ int main(int argc,char *argv[]){
         return b_source(&dummy);}
     signals_init();
     setup_defaults();
-    login_init();
+    setenv("USER","root",1);
+    setenv("HOME","/root",1);
+    chdir("/root");
 
     if(getpid()==1){
         system("mount -t proc  proc  /proc 2>/dev/null");
         system("mount -t sysfs sys   /sys  2>/dev/null");
         system("mount -t devtmpfs dev /dev  2>/dev/null");
         system("mount -t tmpfs  tmp  /tmp  2>/dev/null");}
-    fb_startup();   /* init framebuffer wallpaper — boots to pure wallpaper */
-    /* hide TTY cursor and clear screen so wallpaper is all that shows */
-    write(1, "\x1b[?25l\x1b[2J\x1b[H", 15);
-    /* show menu first so user has something to interact with */
-    { Cmd dc={0}; b_menu(&dc); }
+    /* boot straight to wallpaper — no login, no menu, no banner */
+    fb_startup();
+
+    /* shell loop — Shift+M/T handled in readline */
     char line[SH_MAX_INPUT];
     while(running){
-        print_prompt();
         int n=triumph_readline(line,SH_MAX_INPUT);
-        if(n<0){printf("\n"BLD CYN"logout"RST"\n");break;}
-        if(n==0)continue;
+        if(n<0) break;
+        if(n==0) continue;
         hist_add(line);
         run_line(line);}
     if(getpid()==1){
