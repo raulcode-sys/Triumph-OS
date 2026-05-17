@@ -99,6 +99,12 @@ Linux:
 sudo dd if=triumph-os.iso of=/dev/sdX bs=4M status=progress && sync
 ```
 
+OpenBSD:
+```sh
+doas dd if=triumph-os.iso of=/dev/rsd1c bs=1m
+doas sync
+```
+
 Boot from USB — press F12 at startup for the boot menu. Select **Triumph OS** from GRUB.
 
 ### QEMU
