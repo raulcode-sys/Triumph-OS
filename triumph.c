@@ -22,17 +22,19 @@
 #include <grp.h>
 #include <glob.h>
 
-/* wallpaper pixel data - included early, no dependencies */
+#define SH_MAX_INPUT 4096
+#define MAX_ARGS     256
+#define SH_VERSION   "1.0.0"
+#define MAX_TOKENS   512
+#define MAX_PIPES    16
+#define MAX_HISTORY  500
+#define MAX_ALIASES  64
+
+/* wallpaper pixel data - no dependencies */
 #include "wallpaper.h"
 #include <ctype.h>
 #include <stdarg.h>
 
-#define SH_VERSION  "1.0.0"
-
-#define MAX_TOKENS  512
-#define MAX_PIPES   16
-#define MAX_HISTORY 500
-#define MAX_ALIASES 64
 
 #define RST "\x1b[0m"
 #define BLD "\x1b[1m"
