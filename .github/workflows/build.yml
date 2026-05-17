@@ -22,17 +22,15 @@ jobs:
       - name: Copy kernel modules and firmware
         run: |
           KVER=$(uname -r)
-          mkdir -p initramfs/lib/modules/$KVER/kernel/drivers
-          # ethernet
-          sudo cp -r /lib/modules/$KVER/kernel/drivers/net initramfs/lib/modules/$KVER/kernel/drivers/ 2>/dev/null || true
-          # USB host controllers + tethering
-          sudo cp -r /lib/modules/$KVER/kernel/drivers/usb initramfs/lib/modules/$KVER/kernel/drivers/ 2>/dev/null || true
-          # sound
-          sudo cp -r /lib/modules/$KVER/kernel/sound initramfs/lib/modules/$KVER/kernel/ 2>/dev/null || true
-          # firmware
-          sudo cp -r /lib/firmware initramfs/lib/firmware/ 2>/dev/null || true
-          # module dependency files
-          sudo cp /lib/modules/$KVER/modules.* initramfs/lib/modules/$KVER/ 2>/dev/null || true
+          echo "Kernel version: $KVER"
+          sudo mkdir -p initramfs/lib/modules
+          sudo cp -r /lib/modules/$KVER initramfs/lib/modules/
+          sudo mkdir -p initramfs/lib/firmware
+          sudo cp -r /lib/firmware/* initramfs/lib/firmware/ 2>/dev/null || true
+          find initramfs/lib/modules -name "ipheth*" -o -name "cdc_ether*" -o -name "usbnet*" -o -name "rndis*" | head -20
+          echo "---"
+          find initramfs/lib/modules -name "*.ko" | wc -l
+          echo "total .ko files copied"
 
       - name: Patch init.c module paths
         run: |
