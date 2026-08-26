@@ -158,7 +158,3 @@ qemu-system-x86_64 \
 
 | `setup_persist.c` | Persistent USB storage setup |
 | `gen_wallpaper.py` | Converts PNG → wallpaper.h |
-
-## License
-
-Public domain. Do whatever you want with it.
