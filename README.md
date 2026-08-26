@@ -1,6 +1,7 @@
 # Triumph OS
 
 A from-scratch operating system written in C, running on a Linux kernel with a custom userspace. Single static binary for the entire shell, compositor, and apps.
+It is important to understand it uses the Linux kernel.
 
 Triumph is a standalone Linux distro — not a desktop environment or a container. It boots from USB on real hardware, renders a wallpaper to the framebuffer, and gives you a keyboard-driven shell compositor with games, a web browser, a file explorer, and more.
 
