@@ -4,14 +4,6 @@ A from-scratch operating system written in C, running on a Linux kernel with a c
 
 Triumph is a standalone Linux distro — not a desktop environment or a container. It boots from USB on real hardware, renders a wallpaper to the framebuffer, and gives you a keyboard-driven shell compositor with games, a web browser, a file explorer, and more.
 
-```
-████████╗██████╗ ██╗██╗   ██╗███╗   ███╗██████╗ ██╗  ██╗
-╚══██╔══╝██╔══██╗██║██║   ██║████╗ ████║██╔══██╗██║  ██║
-   ██║   ██████╔╝██║██║   ██║██╔████╔██║██████╔╝███████║
-   ██║   ██╔══██╗██║██║   ██║██║╚██╔╝██║██╔═══╝ ██╔══██║
-   ██║   ██║  ██║██║╚██████╔╝██║ ╚═╝ ██║██║     ██║  ██║
-   ╚═╝   ╚═╝  ╚═╝╚═╝ ╚═════╝ ╚═╝     ╚═╝╚═╝     ╚═╝  ╚═╝
-```
 
 ## What's new in v2
 
@@ -105,7 +97,9 @@ doas dd if=triumph-os.iso of=/dev/rsd1c bs=1m
 doas sync
 ```
 
-Boot from USB — press F12 at startup for the boot menu. Select **Triumph OS** from GRUB.
+Or use software like Balena Etcher.
+
+Boot from USB — press your boot key at startup for the boot menu. Select **Triumph OS** from GRUB.
 
 ### QEMU
 
