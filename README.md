@@ -1,5 +1,10 @@
 # Triumph OS
 
+[![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](LICENSE)
+[![Made with C](https://img.shields.io/badge/Made%20with-C-00599C.svg)](https://github.com/butaraul/Triumph-OS)
+[![OS](https://img.shields.io/badge/OS-Linux-003366.svg)](https://github.com/butaraul/Triumph-OS)
+[![GitHub stars](https://img.shields.io/github/stars/butaraul/Triumph-OS.svg?style=social)](https://github.com/butaraul/Triumph-OS/stargazers)
+
 It is solely meant for experimenting, if you decide to use it for daily use, you do you.
 
 A from-scratch operating system written in C, running on a Linux kernel with a custom userspace. Single static binary for the entire shell, compositor, and apps.
